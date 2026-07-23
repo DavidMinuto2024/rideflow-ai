@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carpooling INALDE EMBA 2026-2028</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0F1620; --panel:#161F2C; --panel2:#1B2532; --border:#26313F;
+    --text:#EAF0F5; --muted:#8FA0B3; --muted2:#5E7185;
+    --norte:#4FB6A8; --chico:#E8935C; --colina:#C77DFF; --suba:#7EC8E3;
+    --sabana:#9BC53D; --calera:#F2C94C; --centro:#EF6F6C;
+    --amber:#E8A33D;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+
+  header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:18px;
+    border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:22px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase;margin:0 0 6px;}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:28px;margin:0;font-weight:700;line-height:1.15;}
+  h1 span{color:var(--muted);font-weight:500;font-size:16px;display:block;margin-top:6px;font-family:'Inter',sans-serif;}
+
+  .stats{display:flex;gap:22px;flex-wrap:wrap;}
+  .stat{text-align:right;}
+  .stat b{font-family:'JetBrains Mono',monospace;font-size:26px;display:block;color:var(--text);}
+  .stat small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;}
+
+  .layout{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start;}
+  @media (max-width:860px){.layout{grid-template-columns:1fr;}}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .panel-head h2{font-family:'Space Grotesk',sans-serif;font-size:14px;margin:0;font-weight:600;letter-spacing:.02em;}
+  #map{height:460px;width:100%;background:#0c1119;}
+  /* Modo oscuro aplicado a las teselas de OpenStreetMap (los marcadores quedan en otro pane, sin filtro) */
+  #map .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.55);}
+  #map .leaflet-control-zoom a{background:var(--panel2)!important;color:var(--text)!important;border-color:var(--border)!important;}
+  #map .leaflet-control-attribution{background:rgba(15,22,32,.75)!important;color:var(--muted2)!important;}
+  #map .leaflet-control-attribution a{color:var(--muted)!important;}
+
+  .chips{display:flex;gap:7px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--border);}
+  .chip{border:1px solid var(--border);background:var(--panel2);color:var(--muted);font-size:12px;
+    padding:6px 11px;border-radius:100px;cursor:pointer;display:flex;align-items:center;gap:6px;
+    font-family:'Inter',sans-serif;transition:.15s;}
+  .chip:hover{border-color:var(--muted2);color:var(--text);}
+  .chip.active{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600;}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+
+  .search{padding:12px 18px;border-bottom:1px solid var(--border);}
+  .search input{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:9px 12px;font-family:'Inter';font-size:13px;}
+  .search input:focus{outline:none;border-color:var(--amber);}
+
+  #roster{max-height:520px;overflow-y:auto;}
+  .card{padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s;}
+  .card:hover, .card.hl{background:var(--panel2);}
+  .card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .card-name{font-weight:600;font-size:13.5px;}
+  .role-tag{font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:5px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;}
+  .role-conductor{background:rgba(79,182,168,.15);color:var(--norte);}
+  .role-busca{background:rgba(239,111,108,.15);color:var(--centro);}
+  .role-ambos{background:rgba(242,201,76,.15);color:var(--calera);}
+  .card-meta{color:var(--muted);font-size:12px;margin-top:4px;line-height:1.5;}
+  .card-meta b{color:var(--muted);font-weight:600;}
+  .card-zone{font-size:10.5px;color:var(--muted2);margin-top:5px;font-family:'JetBrains Mono',monospace;}
+  .cupos-pill{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);}
+
+  .legend{padding:12px 18px;display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);}
+  .legend span{display:flex;align-items:center;gap:5px;}
+
+  .footnote{margin-top:18px;font-size:12px;color:var(--muted2);line-height:1.6;}
+  .footnote b{color:var(--muted);}
+  .pending{margin-top:14px;padding:14px 18px;background:var(--panel);border:1px solid var(--border);border-radius:14px;font-size:12.5px;color:var(--muted);}
+  .pending b{color:var(--text);}
+
+  .leaflet-popup-content-wrapper{background:var(--panel2);color:var(--text);border-radius:8px;}
+  .leaflet-popup-tip{background:var(--panel2);}
+  .leaflet-popup-content{font-family:'Inter';font-size:12.5px;margin:10px 12px;}
+  .leaflet-popup-content b{font-family:'Space Grotesk';}
+
+  .loc-panel{padding:12px 18px;border-bottom:1px solid var(--border);background:var(--panel2);}
+  .loc-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .loc-btn{font-family:'Inter';font-size:12px;font-weight:600;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;gap:6px;transition:.15s;}
+  .loc-btn:hover{border-color:var(--amber);}
+  .loc-btn.clear{color:var(--centro);border-color:transparent;background:transparent;font-weight:500;}
+  .loc-hint{font-size:11.5px;color:var(--muted2);margin-top:7px;line-height:1.5;}
+  .loc-status{font-size:12px;color:var(--norte);margin-top:7px;display:none;}
+  .loc-status.show{display:block;}
+  .dist-pill{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--norte);background:rgba(79,182,168,.13);
+    padding:2px 7px;border-radius:5px;white-space:nowrap;}
+  .pulse{animation:pulse 1.6s ease-out infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(232,163,61,.55);}100%{box-shadow:0 0 0 14px rgba(232,163,61,0);}}
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">EMBA 2026–2028 · Coordinación de transporte</p>
+      <h1>Radar de Carpooling<span>Extraído del chat de WhatsApp del curso — 34 compañeros ubicados en 7 zonas de la Sabana</span></h1>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="statConductores">–</b><small>Ofrecen carro</small></div>
+      <div class="stat"><b id="statCupos">–</b><small>Cupos disponibles</small></div>
+      <div class="stat"><b id="statBuscan">–</b><small>Buscan cupo</small></div>
+      <div class="stat"><b id="statZonas">–</b><small>Zonas</small></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="panel">
+      <div class="panel-head"><h2>Mapa por zona</h2><span style="color:var(--muted2);font-size:11px;font-family:'JetBrains Mono',monospace;">click en un pin ↔ resalta ficha</span></div>
+      <div class="chips" id="chips"></div>
+      <div id="map"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Compañeros (<span id="countRoster">0</span>)</h2></div>
+      <div class="loc-panel">
+        <div class="loc-row">
+          <button class="loc-btn" id="btnGeo">📍 Usar mi GPS</button>
+          <button class="loc-btn" id="btnClickMap">🗺️ Marcar en el mapa</button>
+          <button class="loc-btn clear" id="btnClearLoc" style="display:none;">✕ Quitar mi ubicación</button>
+        </div>
+        <div class="loc-hint" id="locHint">Marca tu punto de partida para ver, ordenados por cercanía, quién vive más cerca de ti.</div>
+        <div class="loc-status" id="locStatus"></div>
+      </div>
+      <div class="search"><input id="searchBox" placeholder="Buscar por nombre... (busca en los 33, sin importar el filtro de zona)"/></div>
+      <div id="roster"></div>
+    </div>
+  </div>
+
+  <div class="pending"><b>Pendientes por ubicar:</b> Javi López propuso organizar el carpooling por zonas pero no compartió su ubicación en el chat — pídele el dato y él aparece automáticamente si actualizas el JSON de datos.</div>
+
+  <p class="footnote"><b>Nota metodológica:</b> las coordenadas son aproximadas (a nivel de barrio/intersección mencionada en el chat), suficientes para agrupar por zona y decidir con quién coordinar — no son direcciones exactas. Placa = último dígito para pico y placa. Los datos vienen directamente de los mensajes del 21–22 de jul/2026; si el grupo sigue conversando, vuelve a exportar el chat y reemplaza el arreglo <code>PEOPLE</code> en este archivo.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const ZONES = {
+  norte:  {label:'Cedritos–Contador', color:'var(--norte)',  hex:'#4FB6A8'},
+  chico:  {label:'Chicó–Rosales–Sta. Bárbara', color:'var(--chico)', hex:'#E8935C'},
+  colina: {label:'Colina–Autopista Norte', color:'var(--colina)', hex:'#C77DFF'},
+  suba:   {label:'Suba–Guaymaral', color:'var(--suba)', hex:'#7EC8E3'},
+  sabana: {label:'Chía–Cajicá', color:'var(--sabana)', hex:'#9BC53D'},
+  calera: {label:'La Calera', color:'var(--calera)', hex:'#F2C94C'},
+  centro: {label:'Centro–Occidente', color:'var(--centro)', hex:'#EF6F6C'},
+};
+
+// rol: 'conductor' (ofrece), 'busca' (necesita cupo), 'ambos' (a veces conductor, a veces necesita)
+const PEOPLE = [
+  {n:'Ricardo Andrés Barreto', z:'chico', lat:4.669,lng:-74.056, rol:'ambos', lugar:'Chicó Navarra', dias:'Días pares y sábados', cupos:null, placa:null, nota:'Sin carro el 31-jul (día 1 de clase) — necesita cupo ese día'},
+  {n:'Carolina Ruiz', z:'chico', lat:4.6685,lng:-74.057, rol:'ambos', lugar:'Chicó Navarra / 105 con 19A', dias:'Días pares y sábados', cupos:null, placa:null, nota:'Sin carro el 31-jul — coordinó con Verónica'},
+  {n:'Heli', z:'sabana', lat:4.860,lng:-74.043, rol:'conductor', lugar:'Chía', dias:'Ofrece llevar si alguien no tiene carro', cupos:null, placa:null, nota:''},
+  {n:'Maria Andrea Nader H.', z:'chico', lat:4.672,lng:-74.053, rol:'conductor', lugar:'Chicó Norte II', dias:'Todos los días', cupos:null, placa:null, nota:''},
+  {n:'Andrés Holguín', z:'norte', lat:4.727,lng:-74.039, rol:'conductor', lugar:'Cedritos', dias:'—', cupos:null, placa:'6', nota:''},
+  {n:'Lucas Congote', z:'chico', lat:4.666,lng:-74.054, rol:'conductor', lugar:'Chicó Reservado', dias:'Todos los días (viernes desde 127 con 53)', cupos:null, placa:null, nota:''},
+  {n:'Diana Moreno', z:'centro', lat:4.678,lng:-74.081, rol:'conductor', lugar:'La Floresta', dias:'Todos los días', cupos:null, placa:null, nota:''},
+  {n:'Verónica', z:'chico', lat:4.691,lng:-74.041, rol:'ambos', lugar:'Calle 119 con 19', dias:'Placa impar', cupos:null, placa:'impar', nota:'El 31-jul sí tiene carro disponible'},
+  {n:'Diana Cárdenas', z:'colina', lat:4.729,lng:-74.057, rol:'conductor', lugar:'Colina / 182 con Autopista', dias:'Todos los días', cupos:null, placa:null, nota:'31-jul sale desde Colina; el resto de viernes desde 182 con Autopista'},
+  {n:'Felipe Gast', z:'norte', lat:4.727,lng:-74.039, rol:'conductor', lugar:'Cedritos', dias:'—', cupos:null, placa:'1', nota:'Sale por la séptima desde la 140'},
+  {n:'Felipe', z:'colina', lat:4.729,lng:-74.058, rol:'conductor', lugar:'Colina', dias:'Viernes', cupos:3, placa:'Híbrido (sin pico y placa)', nota:''},
+  {n:'Caro Ortiz', z:'sabana', lat:4.859,lng:-74.045, rol:'ambos', lugar:'Chía', dias:'Cuando tiene carro disponible', cupos:null, placa:null, nota:'Cuando no tiene carro, busca que la acerquen'},
+  {n:'Sebastian Baena', z:'norte', lat:4.716,lng:-74.035, rol:'conductor', lugar:'Calle 134', dias:'Todos los días', cupos:null, placa:null, nota:''},
+  {n:'Jaime Gacharná Madrigal', z:'colina', lat:4.686,lng:-74.057, rol:'conductor', lugar:'Calle 80 (Pte. Guadua) / Colina sábados', dias:'Viernes y sábados', cupos:1, placa:null, nota:'Viernes 1 cupo (va en Twizy); sábados desde Colina (Arturo Calle) 4 cupos'},
+  {n:'Linares', z:'suba', lat:4.770,lng:-74.093, rol:'conductor', lugar:'Suba (vía Guaymaral) / vive en Cajicá', dias:'Días pares', cupos:2, placa:null, nota:''},
+  {n:'Orlando Martínez', z:'sabana', lat:4.919,lng:-74.026, rol:'ambos', lugar:'Cajicá', dias:'—', cupos:null, placa:null, nota:'A la orden si alguien necesita'},
+  {n:'Germán David Escobar', z:'calera', lat:4.720,lng:-73.969, rol:'busca', lugar:'La Calera', dias:'—', cupos:null, placa:null, nota:'Buscaba compañero de zona; ya coordinó con John Gabriel y Rau1'},
+  {n:'Cristina Rodríguez', z:'chico', lat:4.687,lng:-74.040, rol:'conductor', lugar:'Rosales / 105 con 19A', dias:'Todos los días', cupos:3, placa:null, nota:''},
+  {n:'German Narváez', z:'centro', lat:4.647,lng:-74.093, rol:'conductor', lugar:'Calle 26 con 30', dias:'—', cupos:2, placa:'4', nota:''},
+  {n:'Yesid Santamaría', z:'chico', lat:4.675,lng:-74.045, rol:'conductor', lugar:'Santa Bárbara', dias:'Todos los días', cupos:null, placa:null, nota:''},
+  {n:'Rau1', z:'calera', lat:4.718,lng:-73.972, rol:'busca', lugar:'Cerca a La Calera', dias:'Placa impar', cupos:null, placa:'impar', nota:'Coordinó con Germán David por cercanía'},
+  {n:'Stefania P.', z:'norte', lat:4.716,lng:-74.035, rol:'conductor', lugar:'Calle 134 con Cra 11 (Cedritos–Contador)', dias:'Todos los días', cupos:null, placa:null, nota:''},
+  {n:'Cristian Dueñas', z:'norte', lat:4.701,lng:-74.033, rol:'conductor', lugar:'127 con Séptima', dias:'Placa impar', cupos:null, placa:'impar', nota:''},
+  {n:'Edgar Martínez', z:'centro', lat:4.702,lng:-74.147, rol:'conductor', lugar:'Aeropuerto El Dorado (vie) / Quinta Paredes (sáb)', dias:'Viernes y sábados', cupos:null, placa:'Híbrido (sin pico y placa)', nota:''},
+  {n:'Erika', z:'colina', lat:4.729,lng:-74.057, rol:'busca', lugar:'Colina', dias:'Un día puntual sin carro', cupos:null, placa:null, nota:'Le pidió cupo a Diana Cárdenas'},
+  {n:'Paula Cabas', z:'norte', lat:4.707,lng:-74.033, rol:'conductor', lugar:'Torre Pacific 110 con 9na (vie) / Quirinal (sáb)', dias:'Viernes y sábados', cupos:null, placa:'Híbrido (sin pico y placa)', nota:''},
+  {n:'Daniel Ojeda', z:'norte', lat:4.701,lng:-74.033, rol:'conductor', lugar:'127 con Séptima', dias:'Turna Bogotá / Chía', cupos:null, placa:'0', nota:''},
+  {n:'Juan Garcés', z:'norte', lat:4.735,lng:-74.030, rol:'conductor', lugar:'7ma con 146', dias:'—', cupos:null, placa:'2', nota:''},
+  {n:'Silvia Aristizábal', z:'chico', lat:4.675,lng:-74.045, rol:'conductor', lugar:'Santa Bárbara', dias:'Todos los días', cupos:null, placa:null, nota:''},
+  {n:'John Gabriel Guerrero B.', z:'calera', lat:4.719,lng:-73.970, rol:'conductor', lugar:'La Calera', dias:'—', cupos:null, placa:null, nota:'Ofreció rotarse con Germán David'},
+  {n:'Julia María', z:'colina', lat:4.7295,lng:-74.0575, rol:'conductor', lugar:'Cerca ed. Arturo Calle (Colina)', dias:'—', cupos:null, placa:null, nota:'Propuso rotarse con el grupo de Colina'},
+  {n:'David Eduardo', z:'norte', lat:4.741,lng:-74.033, rol:'conductor', lugar:'Calle 138 con 11', dias:'Días pares', cupos:null, placa:null, nota:'Zona Cedritos — varios compañeros cerca'},
+  {n:'Olga Santamaría Aguilera', z:'chico', lat:4.677,lng:-74.050, rol:'conductor', lugar:'Calle 93', dias:'Placa impar', cupos:null, placa:'impar', nota:''},
+];
+
+// ---------- stats ----------
+const conductores = PEOPLE.filter(p=>p.rol==='conductor'||p.rol==='ambos').length;
+const cupos = PEOPLE.reduce((s,p)=>s+(p.cupos||0),0);
+const buscan = PEOPLE.filter(p=>p.rol==='busca'||p.rol==='ambos').length;
+document.getElementById('statConductores').textContent = conductores;
+document.getElementById('statCupos').textContent = cupos + '+';
+document.getElementById('statBuscan').textContent = buscan;
+document.getElementById('statZonas').textContent = Object.keys(ZONES).length;
+
+// ---------- chips ----------
+const chipsEl = document.getElementById('chips');
+let activeZone = 'all';
+function renderChips(){
+  chipsEl.innerHTML = '';
+  const searching = searchBox.value.trim().length > 0;
+  const allChip = document.createElement('div');
+  allChip.className = 'chip' + (!searching && activeZone==='all' ? ' active' : '');
+  allChip.textContent = 'Todas';
+  allChip.onclick = ()=>{activeZone='all'; searchBox.value=''; refresh();};
+  chipsEl.appendChild(allChip);
+  Object.entries(ZONES).forEach(([key,z])=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (!searching && activeZone===key ? ' active' : '');
+    c.innerHTML = `<span class="dot" style="background:${z.hex}"></span>${z.label}`;
+    c.onclick = ()=>{activeZone = (activeZone===key? 'all':key); searchBox.value=''; refresh();};
+    chipsEl.appendChild(c);
+  });
+  if(searching){
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11px;color:var(--muted2);align-self:center;font-family:JetBrains Mono,monospace;';
+    hint.textContent = '(buscando en los 33 — filtro de zona en pausa)';
+    chipsEl.appendChild(hint);
+  }
+}
+
+// ---------- legend ----------
+const legendEl = document.getElementById('legend');
+legendEl.innerHTML = Object.values(ZONES).map(z=>`<span><span class="dot" style="background:${z.hex}"></span>${z.label}</span>`).join('');
+
+// ---------- map ----------
+const map = L.map('map',{scrollWheelZoom:false}).setView([4.76,-74.05], 10.6);
+const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'&copy; OpenStreetMap contributors', maxZoom:19
+}).addTo(map);
+let tileErrorShown = false;
+tileLayer.on('tileerror', ()=>{
+  if(tileErrorShown) return;
+  tileErrorShown = true;
+  const st = document.getElementById('locStatus');
+  st.textContent = '⚠️ El mapa base no cargó (posible bloqueo de red) — los pines y la búsqueda por cercanía siguen funcionando igual.';
+  st.classList.add('show');
+});
+map.on('click', (e)=> setUserLoc(e.latlng.lat, e.latlng.lng, 'clic en el mapa'));
+
+let markers = [];
+let userLoc = null; // {lat, lng}
+let userMarker = null;
+
+function haversineKm(lat1,lng1,lat2,lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function setUserLoc(lat, lng, sourceLabel){
+  userLoc = {lat, lng};
+  if(userMarker) map.removeLayer(userMarker);
+  const icon = L.divIcon({
+    className:'', html:`<div class="pulse" style="width:16px;height:16px;border-radius:50%;background:${'#E8A33D'};border:3px solid #0F1620;"></div>`,
+    iconSize:[16,16], iconAnchor:[8,8]
+  });
+  userMarker = L.marker([lat,lng], {icon, zIndexOffset:1000}).addTo(map);
+  userMarker.bindPopup(`<b>Tu ubicación</b>${sourceLabel? '<br>'+sourceLabel:''}`).openPopup();
+  map.setView([lat,lng], 12.5, {animate:true});
+  document.getElementById('btnClearLoc').style.display = 'flex';
+  document.getElementById('locHint').textContent = 'Ordenado por cercanía a tu punto — haz clic en otro lugar del mapa para ajustarlo.';
+  const st = document.getElementById('locStatus');
+  st.textContent = `📍 Ubicación marcada${sourceLabel? ' ('+sourceLabel+')':''}. La lista de la derecha ahora muestra primero a quien vive más cerca.`;
+  st.classList.add('show');
+  refresh();
+}
+
+function clearUserLoc(){
+  userLoc = null;
+  if(userMarker){ map.removeLayer(userMarker); userMarker = null; }
+  document.getElementById('btnClearLoc').style.display = 'none';
+  document.getElementById('locHint').textContent = 'Marca tu punto de partida para ver, ordenados por cercanía, quién vive más cerca de ti.';
+  document.getElementById('locStatus').classList.remove('show');
+  refresh();
+}
+
+document.getElementById('btnClearLoc').onclick = clearUserLoc;
+document.getElementById('btnClickMap').onclick = ()=>{
+  document.getElementById('locStatus').textContent = '🗺️ Haz clic en cualquier punto del mapa para marcar tu ubicación.';
+  document.getElementById('locStatus').classList.add('show');
+};
+document.getElementById('btnGeo').onclick = ()=>{
+  const st = document.getElementById('locStatus');
+  if(!navigator.geolocation){
+    st.textContent = 'Tu navegador no soporta geolocalización — usa "Marcar en el mapa".';
+    st.classList.add('show');
+    return;
+  }
+  st.textContent = 'Solicitando tu ubicación...';
+  st.classList.add('show');
+  navigator.geolocation.getCurrentPosition(
+    pos => setUserLoc(pos.coords.latitude, pos.coords.longitude, 'GPS'),
+    err => {
+      st.textContent = 'No se pudo obtener tu GPS (permiso denegado o no disponible) — haz clic en el mapa como alternativa.';
+      st.classList.add('show');
+    },
+    {enableHighAccuracy:true, timeout:8000}
+  );
+};
+function roleTag(rol){
+  if(rol==='conductor') return '<span class="role-tag role-conductor">Conductor</span>';
+  if(rol==='busca') return '<span class="role-tag role-busca">Busca cupo</span>';
+  return '<span class="role-tag role-ambos">Conductor / a veces cupo</span>';
+}
+
+function buildMarkers(){
+  markers.forEach(m=>map.removeLayer(m.marker));
+  markers = [];
+  PEOPLE.forEach((p,i)=>{
+    const z = ZONES[p.z];
+    const icon = L.divIcon({
+      className:'', html:`<div style="width:14px;height:14px;border-radius:50%;background:${z.hex};border:2px solid #0F1620;box-shadow:0 0 0 2px ${z.hex}55;"></div>`,
+      iconSize:[14,14], iconAnchor:[7,7]
+    });
+    const marker = L.marker([p.lat,p.lng],{icon}).addTo(map);
+    marker.bindPopup(`<b>${p.n}</b><br>${p.lugar}<br>${roleTag(p.rol)}`);
+    marker.on('click', ()=>highlightCard(i));
+    markers.push({marker, idx:i});
+  });
+}
+
+// ---------- roster ----------
+const rosterEl = document.getElementById('roster');
+const countEl = document.getElementById('countRoster');
+const searchBox = document.getElementById('searchBox');
+
+function highlightCard(idx){
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('hl'));
+  const el = document.querySelector(`.card[data-idx="${idx}"]`);
+  if(el){ el.classList.add('hl'); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+}
+
+function norm(s){
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+function renderRoster(){
+  const qRaw = searchBox.value.trim();
+  const q = norm(qRaw);
+  // Si hay texto de búsqueda, se busca entre los 33 sin importar la zona activa;
+  // el filtro de zona solo aplica cuando el buscador está vacío.
+  let filtered = PEOPLE
+    .map((p,i)=>({p,i}))
+    .filter(({p})=> {
+      const matchesQuery = norm(p.n).includes(q);
+      if(q) return matchesQuery;
+      return (activeZone==='all' || p.z===activeZone);
+    });
+
+  if(userLoc){
+    filtered = filtered.map(item=>({...item, dist: haversineKm(userLoc.lat,userLoc.lng,item.p.lat,item.p.lng)}));
+    filtered.sort((a,b)=> a.dist - b.dist);
+  }
+
+  countEl.textContent = filtered.length;
+  rosterEl.innerHTML = filtered.map(({p,i,dist},idx)=>`
+    <div class="card" data-idx="${i}" onclick="focusMarker(${i})">
+      <div class="card-top">
+        <span class="card-name">${userLoc && idx===0 ? '🎯 ' : ''}${p.n}</span>
+        ${roleTag(p.rol)}
+      </div>
+      <div class="card-meta"><b>${p.lugar}</b> · ${p.dias}${p.placa? ' · Placa: '+p.placa:''}${p.cupos? ' · <span class="cupos-pill">'+p.cupos+' cupos</span>':''}${dist!==undefined? ' · <span class="dist-pill">'+dist.toFixed(1)+' km de ti</span>':''}</div>
+      ${p.nota? `<div class="card-meta" style="opacity:.8;font-style:italic;">${p.nota}</div>` : ''}
+      <div class="card-zone">${ZONES[p.z].label.toUpperCase()}</div>
+    </div>
+  `).join('') || '<div style="padding:20px;color:var(--muted);font-size:13px;">Sin resultados.</div>';
+}
+
+window.focusMarker = function(idx){
+  const p = PEOPLE[idx];
+  map.setView([p.lat,p.lng], 13, {animate:true});
+  markers.find(m=>m.idx===idx).marker.openPopup();
+  highlightCard(idx);
+};
+
+function refresh(){ renderChips(); renderRoster(); }
+searchBox.addEventListener('input', ()=>{ renderChips(); renderRoster(); });
+
+buildMarkers();
+refresh();
+</script>
+</body>
+</html>

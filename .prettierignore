@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+coverage
+.git
+Dockerfile
+.dockerignore
+*.png
+*.jpg
+*.svg
+*.ico

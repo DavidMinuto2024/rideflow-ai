@@ -1,0 +1,224 @@
+// ═══════════════════════════════════════════════════════════
+// RideFlow AI — Prisma Schema
+//
+// PostgreSQL (Supabase) — multi-tenant from the start.
+// Every entity is scoped to an Organization.
+// ═══════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  ORG_ADMIN
+  DRIVER
+  PASSENGER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  OPEN
+  CLOSED
+  FINISHED
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+// ─── Organization ─────────────────────────────────────────
+// Root tenant entity — everything belongs to an org.
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members OrganizationMember[]
+  vehicles Vehicle[]
+  events   Event[]
+}
+
+// ─── User ─────────────────────────────────────────────────
+// Platform user identified by Supabase Auth email.
+// A user can belong to multiple orgs with different roles.
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members        OrganizationMember[]
+  vehicles       Vehicle[]
+  rideRequests   RideRequest[]
+  drivenTrips    Trip[]               @relation("DriverTrips")
+  assignments    PassengerAssignment[]
+  notifications  Notification[]
+}
+
+// ─── OrganizationMember ───────────────────────────────────
+// Joins User → Organization with a role.
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  role           Role         @default(PASSENGER)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, userId])
+}
+
+// ─── Vehicle ──────────────────────────────────────────────
+// Registered to an org and optionally linked to a driver.
+
+model Vehicle {
+  id          String   @id @default(cuid())
+  plate       String?
+  model       String?
+  capacity    Int      @default(4)
+  isActive    Boolean  @default(true)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  driverId       String?
+  driver         User?        @relation(fields: [driverId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trips Trip[]
+}
+
+// ─── Event ────────────────────────────────────────────────
+// An event with a date, origin, and destination.
+// State machine: DRAFT → PUBLISHED → OPEN → CLOSED → FINISHED
+
+model Event {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  origin      String
+  originLat   Float?
+  originLng   Float?
+  destination String
+  destLat     Float?
+  destLng     Float?
+  capacity    Int         @default(4)
+  status      EventStatus @default(DRAFT)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trips Trip[]
+  rideRequests RideRequest[]
+}
+
+// ─── Trip ─────────────────────────────────────────────────
+// A specific ride instance within an event, assigned to a driver + vehicle.
+
+model Trip {
+  id        String   @id @default(cuid())
+  origin    String?
+  dest      String?
+  notes     String?
+  distance  Float?   // OSRM-optimized distance in meters
+  duration  Float?   // OSRM-optimized duration in seconds
+  routeGeometry String? // OSRM polyline geometry
+
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  driverId  String
+  driver    User     @relation("DriverTrips", fields: [driverId], references: [id])
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rideRequests        RideRequest[]
+  passengerAssignments PassengerAssignment[]
+}
+
+// ─── RideRequest ─────────────────────────────────────────
+// Passenger requests to join an event. Driver accepts/rejects.
+// tripId is optional — assigned after approval or by the assignment engine.
+
+model RideRequest {
+  id          String        @id @default(cuid())
+  status      RequestStatus @default(PENDING)
+
+  tripId      String?
+  trip        Trip?         @relation(fields: [tripId], references: [id])
+  eventId     String
+  event       Event         @relation(fields: [eventId], references: [id])
+  passengerId String
+  passenger   User          @relation(fields: [passengerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, passengerId])
+}
+
+// ─── PassengerAssignment ─────────────────────────────────
+// Confirmed passenger on a trip (after request is accepted).
+
+model PassengerAssignment {
+  id        String   @id @default(cuid())
+
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([tripId, userId])
+}
+
+// ─── Notification ─────────────────────────────────────────
+// In-app notifications for ride events, reminders, etc.
+// Push/email scaffolding for post-MVP.
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // RIDE_REQUESTED, RIDE_APPROVED, RIDE_REJECTED, TRIP_ASSIGNED, EVENT_REMINDER
+  title     String
+  message   String?
+  read      Boolean  @default(false)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

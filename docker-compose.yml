@@ -1,0 +1,93 @@
+# ═══════════════════════════════════════════════════════════
+# RideFlow AI — Docker Compose
+#
+# Services:
+#   postgres  - Local PostgreSQL (for dev without Supabase)
+#   backend   - NestJS API (dev mode with hot-reload)
+#   frontend  - Next.js app (dev mode)
+#   osrm      - OSRM route optimization (for Phase 2+)
+# ═══════════════════════════════════════════════════════════
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rideflow-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: rideflow
+      POSTGRES_PASSWORD: rideflow
+      POSTGRES_DB: rideflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rideflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: rideflow-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://rideflow:rideflow@postgres:5432/rideflow
+      - PORT=4000
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: rideflow-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: rideflow-osrm
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - osrm-data:/data
+    command: >
+      sh -c "
+        if [ ! -f /data/colombia-latest.osrm ]; then
+          wget -O /data/colombia-latest.osm.pbf http://download.geofabrik.de/south-america/colombia-latest.osm.pbf &&
+          osrm-extract -p /opt/car.lua /data/colombia-latest.osm.pbf &&
+          osrm-partition /data/colombia-latest.osrm &&
+          osrm-customize /data/colombia-latest.osrm
+        fi &&
+        osrm-routed --algorithm mld /data/colombia-latest.osrm
+      "
+    profiles:
+      - routing
+    # OSRM is heavy (~2GB RAM when extracting). Use `docker compose --profile routing up` only when needed.
+
+volumes:
+  postgres-data:
+  osrm-data:
