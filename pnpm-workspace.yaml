@@ -1,4 +1,11 @@
 packages:
-  - 'backend'
-  - 'frontend'
-  - 'shared/*'
+  - backend
+  - frontend
+  - shared/*
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - unrs-resolver

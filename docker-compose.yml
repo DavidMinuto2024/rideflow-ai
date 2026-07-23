@@ -14,7 +14,7 @@ services:
     container_name: rideflow-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: rideflow
       POSTGRES_PASSWORD: rideflow

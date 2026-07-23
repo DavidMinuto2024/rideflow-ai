@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
@@ -6,6 +6,7 @@ import { AuthGuard } from './auth.guard';
 import { RolesGuard } from './roles.guard';
 import { SupabaseAuthService } from './supabase-auth.service';
 
+@Global()
 @Module({
   imports: [
     ConfigModule,
