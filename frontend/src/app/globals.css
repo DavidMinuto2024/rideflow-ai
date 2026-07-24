@@ -6,33 +6,86 @@
 
 @layer base {
   :root {
-    --bg: #0F1620;
-    --panel: #161F2C;
-    --panel2: #1B2532;
-    --border: #26313F;
-    --text: #EAF0F5;
-    --muted: #8FA0B3;
-    --muted2: #5E7185;
+    /* Background & surfaces */
+    --color-bg: 11 17 33;
+    --color-surface: 19 27 46;
+    --color-surface-hover: 26 36 64;
+    --color-border: 42 58 92;
+
+    /* Brand */
+    --color-primary: 34 211 238;
+    --color-primary-hover: 6 182 212;
+    --color-accent: 232 163 61;
+    --color-secondary: 129 140 248;
+
+    /* Semantic */
+    --color-destructive: 239 68 68;
+    --color-warning: 245 158 11;
+    --color-success: 16 185 129;
+
+    /* Text */
+    --color-text-primary: 241 245 249;
+    --color-text-secondary: 148 163 184;
+    --color-text-muted: 100 116 139;
+
+    /* Focus ring */
+    --color-ring: 34 211 238;
+  }
+
+  * {
+    @apply border-border;
   }
 
   body {
-    @apply bg-rideflow-bg text-rideflow-text font-body antialiased;
+    @apply bg-bg text-text-primary font-body antialiased;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-muted;
+  }
+
+  /* Focus ring utility */
+  .focus-ring {
+    @apply outline-none ring-[3px] ring-ring/50;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
   .panel {
-    @apply bg-rideflow-panel border border-rideflow-border rounded-xl overflow-hidden;
+    @apply bg-surface border border-border rounded-xl overflow-hidden;
   }
 
   .panel-head {
-    @apply px-4 py-3.5 border-b border-rideflow-border flex items-center justify-between;
+    @apply px-4 py-3.5 border-b border-border flex items-center justify-between;
   }
 }
 
-/* Leaflet dark theme overrides (matching carpool.html style) */
+/* Leaflet dark theme overrides */
 .leaflet-container {
-  background: #0c1119;
+  background: #0b1121;
 }
 
 .leaflet-tile-pane {
@@ -40,28 +93,28 @@
 }
 
 .leaflet-control-zoom a {
-  background: #1B2532 !important;
-  color: #EAF0F5 !important;
-  border-color: #26313F !important;
+  background: #1a2440 !important;
+  color: #f1f5f9 !important;
+  border-color: #2a3a5c !important;
 }
 
 .leaflet-control-attribution {
-  background: rgba(15, 22, 32, 0.75) !important;
-  color: #5E7185 !important;
+  background: rgba(11, 17, 33, 0.75) !important;
+  color: #64748b !important;
 }
 
 .leaflet-control-attribution a {
-  color: #8FA0B3 !important;
+  color: #94a3b8 !important;
 }
 
 .leaflet-popup-content-wrapper {
-  background: #1B2532;
-  color: #EAF0F5;
+  background: #1a2440;
+  color: #f1f5f9;
   border-radius: 8px;
 }
 
 .leaflet-popup-tip {
-  background: #1B2532;
+  background: #1a2440;
 }
 
 .leaflet-popup-content {
