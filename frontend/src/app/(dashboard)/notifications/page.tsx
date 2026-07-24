@@ -1,49 +1,70 @@
 'use client';
 
+import { Bell, Check, CheckCheck, Car, Clock, UserPlus, X } from 'lucide-react';
 import {
   useNotifications,
   useMarkAsRead,
   type NotificationType,
 } from '@/lib/queries/notifications';
-import { PageContainer, EmptyState } from '@/components/PageContainer';
-import { PageSkeleton } from '@/components/LoadingSpinner';
+import { PageContainer } from '@/components/PageContainer';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 const typeConfig: Record<
   NotificationType,
-  { icon: string; label: string; color: string }
+  { icon: React.ReactNode; label: string; variant: 'info' | 'success' | 'error' | 'warning' | 'default' }
 > = {
   RIDE_REQUESTED: {
-    icon: '→',
+    icon: <UserPlus className="size-4" />,
     label: 'Solicitud de viaje',
-    color: 'text-blue-400',
+    variant: 'info',
   },
   RIDE_APPROVED: {
-    icon: '✓',
+    icon: <Check className="size-4" />,
     label: 'Viaje aprobado',
-    color: 'text-green-400',
+    variant: 'success',
   },
   RIDE_REJECTED: {
-    icon: '✕',
+    icon: <X className="size-4" />,
     label: 'Viaje rechazado',
-    color: 'text-red-400',
+    variant: 'error',
   },
   TRIP_ASSIGNED: {
-    icon: '🚗',
+    icon: <Car className="size-4" />,
     label: 'Viaje asignado',
-    color: 'text-rideflow-amber',
+    variant: 'warning',
   },
   EVENT_REMINDER: {
-    icon: '⏰',
+    icon: <Clock className="size-4" />,
     label: 'Recordatorio',
-    color: 'text-yellow-400',
+    variant: 'info',
   },
 };
+
+function NotificationsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {[1, 2, 3, 4].map((i) => (
+        <Skeleton key={i} className="h-24 rounded-xl" />
+      ))}
+    </div>
+  );
+}
 
 export default function NotificationsPage() {
   const { data: notifications, isLoading } = useNotifications();
   const markAsRead = useMarkAsRead();
 
-  if (isLoading) return <PageSkeleton />;
+  const handleMarkAllRead = () => {
+    if (!notifications) return;
+    notifications
+      .filter((n) => !n.read)
+      .forEach((n) => markAsRead.mutate(n.id));
+  };
+
+  if (isLoading) return <NotificationsSkeleton />;
 
   return (
     <PageContainer
@@ -51,109 +72,101 @@ export default function NotificationsPage() {
       description="Tus notificaciones y alertas"
     >
       {!notifications || notifications.length === 0 ? (
-        <EmptyState
-          title="Sin notificaciones"
-          description="No tienes notificaciones por ahora."
-          icon={
-            <svg
-              className="w-12 h-12"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-          }
-        />
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Bell className="mx-auto mb-3 size-12 text-text-muted" />
+            <h3 className="mb-1 font-display font-semibold">Sin notificaciones</h3>
+            <p className="text-sm text-text-secondary">
+              No tienes notificaciones por ahora.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {notifications.map((n) => {
             const cfg = typeConfig[n.type] ?? {
-              icon: '•',
+              icon: <Bell className="size-4" />,
               label: n.type,
-              color: 'text-rideflow-muted',
+              variant: 'default' as const,
             };
 
             return (
-              <div
+              <Card
                 key={n.id}
-                className={`panel p-4 flex items-start gap-3 transition ${
+                className={`transition ${
                   !n.read
-                    ? 'border-l-2 border-l-rideflow-amber bg-rideflow-amber/[0.03]'
+                    ? 'border-l-2 border-l-primary bg-primary/[0.02]'
                     : ''
                 }`}
               >
-                {/* Type icon */}
-                <div
-                  className={`w-9 h-9 rounded-full bg-rideflow-panel2 flex items-center justify-center text-sm shrink-0 ${cfg.color}`}
-                >
-                  {cfg.icon}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-medium text-rideflow-muted2 uppercase tracking-wider">
-                      {cfg.label}
+                <CardContent className="flex items-start gap-3 p-4">
+                  <div className={`flex shrink-0 size-9 items-center justify-center rounded-full bg-surface-hover`}>
+                    <span className={`${
+                      cfg.variant === 'error' ? 'text-destructive' :
+                      cfg.variant === 'success' ? 'text-success' :
+                      cfg.variant === 'warning' ? 'text-warning' :
+                      'text-primary'
+                    }`}>
+                      {cfg.icon}
                     </span>
-                    {!n.read && (
-                      <span className="w-2 h-2 rounded-full bg-rideflow-amber shrink-0" />
-                    )}
                   </div>
-                  <p
-                    className={`text-sm ${
-                      !n.read ? 'font-medium text-rideflow-text' : 'text-rideflow-muted'
-                    }`}
-                  >
-                    {n.title}
-                  </p>
-                  {n.message && (
-                    <p className="text-xs text-rideflow-muted2 mt-0.5">
-                      {n.message}
-                    </p>
-                  )}
-                  <p className="text-xs text-rideflow-muted2 mt-1.5">
-                    {new Date(n.createdAt).toLocaleDateString('es', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                </div>
 
-                {/* Mark as read button */}
-                {!n.read && (
-                  <button
-                    onClick={() => markAsRead.mutate(n.id)}
-                    disabled={markAsRead.isPending}
-                    className="shrink-0 px-2.5 py-1 text-xs font-medium text-rideflow-muted hover:text-rideflow-amber bg-rideflow-panel2 rounded-lg transition disabled:opacity-50"
-                  >
-                    {markAsRead.isPending ? '...' : 'Leído'}
-                  </button>
-                )}
-              </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-0.5 flex items-center gap-2">
+                      <Badge variant={cfg.variant} className="uppercase tracking-wider">
+                        {cfg.label}
+                      </Badge>
+                      {!n.read && (
+                        <span className="size-2 shrink-0 rounded-full bg-primary" />
+                      )}
+                    </div>
+                    <p className={`text-sm ${!n.read ? 'font-medium' : 'text-text-secondary'}`}>
+                      {n.title}
+                    </p>
+                    {n.message && (
+                      <p className="mt-0.5 text-xs text-text-muted">
+                        {n.message}
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-xs text-text-muted">
+                      {new Date(n.createdAt).toLocaleDateString('es', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+
+                  {!n.read && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => markAsRead.mutate(n.id)}
+                      disabled={markAsRead.isPending}
+                    >
+                      {markAsRead.isPending ? (
+                        <span className="text-text-muted">...</span>
+                      ) : (
+                        <Check className="size-4" />
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             );
           })}
 
-          {/* Mark all as read */}
           {notifications.some((n) => !n.read) && (
             <div className="pt-2 text-center">
-              <button
-                onClick={() => {
-                  notifications
-                    .filter((n) => !n.read)
-                    .forEach((n) => markAsRead.mutate(n.id));
-                }}
-                className="text-xs text-rideflow-muted hover:text-rideflow-amber transition"
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleMarkAllRead}
               >
+                <CheckCheck className="size-4" />
                 Marcar todas como leídas
-              </button>
+              </Button>
             </div>
           )}
         </div>
