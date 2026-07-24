@@ -1,75 +1,96 @@
 'use client';
 
+import { CalendarDays, Users, Navigation, Clock, Car, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useSession } from '@/lib/queries/auth';
 import { useDashboardStats } from '@/lib/queries/dashboard';
-import { PageContainer, EmptyState, StatusBadge } from '@/components/PageContainer';
-import { PageSkeleton, LoadingSpinner } from '@/components/LoadingSpinner';
-import Link from 'next/link';
+import { PageContainer } from '@/components/PageContainer';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
 import { ApiError } from '@/lib/api';
 
 const statCards = [
   {
-    key: 'activeEvents',
+    key: 'activeEvents' as const,
     label: 'Eventos Activos',
-    color: 'text-rideflow-amber',
-    bg: 'bg-rideflow-amber/10',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
+    icon: CalendarDays,
+    color: 'text-accent',
+    bg: 'bg-accent/10',
     format: (v: number) => v,
   },
   {
-    key: 'totalParticipants',
+    key: 'totalParticipants' as const,
     label: 'Total Participantes',
-    color: 'text-green-400',
-    bg: 'bg-green-500/10',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-      </svg>
-    ),
+    icon: Users,
+    color: 'text-success',
+    bg: 'bg-success/10',
     format: (v: number) => v,
   },
   {
-    key: 'tripsToday',
+    key: 'tripsToday' as const,
     label: 'Viajes Hoy',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-      </svg>
-    ),
+    icon: Navigation,
+    color: 'text-primary',
+    bg: 'bg-primary/10',
     format: (v: number) => v,
   },
   {
-    key: 'pendingRequests',
+    key: 'pendingRequests' as const,
     label: 'Solicitudes Pendientes',
-    color: 'text-yellow-400',
-    bg: 'bg-yellow-500/10',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+    icon: Clock,
+    color: 'text-warning',
+    bg: 'bg-warning/10',
     format: (v: number) => v,
   },
   {
-    key: 'vehicleUtilization',
+    key: 'vehicleUtilization' as const,
     label: 'Uso de Vehículos',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-      </svg>
-    ),
+    icon: Car,
+    color: 'text-secondary',
+    bg: 'bg-secondary/10',
     format: (v: number) => `${Math.round(v * 100)}%`,
   },
 ] as const;
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-10 rounded-lg" />
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-7 w-16" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Skeleton className="h-6 w-40" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <Skeleton className="h-5 w-32 mb-2" />
+              <Skeleton className="h-4 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -81,7 +102,7 @@ export default function DashboardPage() {
     refetch,
   } = useDashboardStats();
 
-  if (sessionLoading || statsLoading) return <PageSkeleton />;
+  if (sessionLoading || statsLoading) return <DashboardSkeleton />;
 
   const memberships = sessionData?.memberships ?? [];
 
@@ -92,90 +113,118 @@ export default function DashboardPage() {
     >
       {/* Stats error banner */}
       {statsError && (
-        <div className="panel p-4 border border-red-500/30 bg-red-500/5 rounded-xl flex items-center justify-between">
-          <p className="text-sm text-red-400">
+        <div className="flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
             {statsError instanceof ApiError
               ? statsError.message
               : 'Error al cargar estadísticas'}
           </p>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => refetch()}
-            className="px-3 py-1.5 text-sm bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg hover:brightness-110 transition"
+            className="text-destructive hover:bg-destructive/10"
           >
+            <RefreshCw className="mr-1.5 size-3.5" />
             Reintentar
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {statCards.map((card) => {
-          const value = stats?.[card.key as keyof typeof stats];
+          const value = stats?.[card.key];
+          const Icon = card.icon;
           return (
-            <div key={card.key} className="panel p-5">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg ${card.bg} flex items-center justify-center`}
-                >
-                  <div className={card.color}>{card.icon}</div>
+            <Card key={card.key}>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex size-10 items-center justify-center rounded-lg ${card.bg}`}
+                  >
+                    <Icon className={`size-5 ${card.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-display font-bold">
+                      {value != null ? card.format(value as number) : '—'}
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      {card.label}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-2xl font-display font-bold">
-                    {value != null ? card.format(value as number) : '—'}
-                  </p>
-                  <p className="text-sm text-rideflow-muted">{card.label}</p>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
 
       {/* My organizations */}
       <div>
-        <h2 className="text-lg font-display font-semibold mb-3">
+        <h2 className="mb-3 text-lg font-display font-semibold">
           Mis organizaciones
         </h2>
         {memberships.length === 0 ? (
-          <EmptyState
-            title="Sin organizaciones"
-            description="Aún no perteneces a ninguna organización."
-            action={
-              <Link
-                href="/organizations"
-                className="inline-flex px-4 py-2 bg-rideflow-amber text-rideflow-bg font-semibold rounded-lg hover:brightness-110 transition text-sm"
-              >
-                Explorar organizaciones
-              </Link>
-            }
-          />
+          <Card>
+            <CardContent className="p-12 text-center">
+              <h3 className="text-lg font-display font-semibold text-text-primary">
+                Sin organizaciones
+              </h3>
+              <p className="mt-1 text-sm text-text-secondary">
+                Aún no perteneces a ninguna organización.
+              </p>
+              <div className="mt-4">
+                <Link href="/organizations">
+                  <Button variant="default">Explorar organizaciones</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {memberships.map(
-              (m: {
-                role: string;
-                organization: { id: string; name: string; slug: string };
-              }) => (
-                <Link
-                  key={m.organization.id}
-                  href={`/organizations/${m.organization.id}`}
-                  className="panel p-4 hover:border-rideflow-amber/50 transition flex items-center justify-between group"
-                >
-                  <div>
-                    <p className="font-medium group-hover:text-rideflow-amber transition">
-                      {m.organization.name}
-                    </p>
-                    <p className="text-sm text-rideflow-muted">
-                      {m.organization.slug}
-                    </p>
-                  </div>
-                  <StatusBadge status={m.role} />
-                </Link>
-              ),
-            )}
+            {memberships.map((m) => (
+              <Link
+                key={m.organization.id}
+                href={`/organizations/${m.organization.id}`}
+                className="block"
+              >
+                <Card className="transition hover:border-primary/50">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="font-medium text-text-primary transition group-hover:text-primary">
+                        {m.organization.name}
+                      </p>
+                      <p className="text-sm text-text-secondary">
+                        {m.organization.slug}
+                      </p>
+                    </div>
+                    <Badge variant={roleToBadgeVariant(m.role)}>
+                      {m.role}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
         )}
       </div>
     </PageContainer>
   );
+}
+
+function roleToBadgeVariant(
+  role: string,
+): 'default' | 'success' | 'warning' | 'error' | 'info' | 'outline' {
+  switch (role) {
+    case 'SUPER_ADMIN':
+    case 'ORG_ADMIN':
+      return 'info';
+    case 'DRIVER':
+      return 'success';
+    case 'PASSENGER':
+      return 'warning';
+    default:
+      return 'outline';
+  }
 }
