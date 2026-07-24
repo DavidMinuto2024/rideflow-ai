@@ -2,16 +2,29 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { CalendarDays, Plus, ArrowUpRight } from 'lucide-react';
 import { useOrganizations } from '@/lib/queries/organizations';
 import { useEvents } from '@/lib/queries/events';
-import { PageContainer, StatusBadge, EmptyState } from '@/components/PageContainer';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { PageContainer } from '@/components/PageContainer';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+
+function EventsListSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Skeleton className="h-10 w-full max-w-md" />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-24 w-full rounded-xl" />
+      ))}
+    </div>
+  );
+}
 
 export default function EventsPage() {
   const { data: orgs } = useOrganizations();
   const [selectedOrg, setSelectedOrg] = useState<string>('');
-
-  // Auto-select first org
   const effectiveOrgId = selectedOrg || orgs?.[0]?.id || '';
   const { data: events, isLoading } = useEvents(effectiveOrgId);
 
@@ -20,90 +33,128 @@ export default function EventsPage() {
       title="Eventos"
       description="Gestiona el ciclo de vida de los eventos"
       action={
-        <Link
-          href={`/events/new${effectiveOrgId ? `?orgId=${effectiveOrgId}` : ''}`}
-          className="px-4 py-2 bg-rideflow-amber text-rideflow-bg font-semibold rounded-lg hover:brightness-110 transition text-sm"
-        >
-          Nuevo evento
+        <Link href={`/events/new${effectiveOrgId ? `?orgId=${effectiveOrgId}` : ''}`}>
+          <Button>
+            <Plus className="size-4" />
+            Nuevo evento
+          </Button>
         </Link>
       }
     >
       {/* Org selector */}
       {orgs && orgs.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
-          {orgs.map((org) => (
-            <button
-              key={org.id}
-              onClick={() => setSelectedOrg(org.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                (selectedOrg || orgs[0]?.id) === org.id
-                  ? 'bg-rideflow-amber/10 text-rideflow-amber border border-rideflow-amber/30'
-                  : 'bg-rideflow-panel text-rideflow-muted border border-rideflow-border hover:text-rideflow-text'
-              }`}
-            >
-              {org.name}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2">
+          {orgs.map((org) => {
+            const isActive = (selectedOrg || orgs[0]?.id) === org.id;
+            return (
+              <Button
+                key={org.id}
+                variant={isActive ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedOrg(org.id)}
+              >
+                {org.name}
+              </Button>
+            );
+          })}
         </div>
       )}
 
       {!effectiveOrgId ? (
-        <EmptyState
-          title="Selecciona una organización"
-          description="Necesitas pertenecer a una organización para ver sus eventos."
-          action={
-            <Link
-              href="/organizations"
-              className="text-rideflow-amber hover:underline text-sm"
-            >
-              Ir a organizaciones
-            </Link>
-          }
-        />
+        <Card>
+          <CardContent className="p-12 text-center">
+            <CalendarDays className="mx-auto mb-4 size-12 text-text-muted" />
+            <h3 className="text-lg font-display font-semibold text-text-primary">
+              Selecciona una organización
+            </h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              Necesitas pertenecer a una organización para ver sus eventos.
+            </p>
+            <div className="mt-4">
+              <Link href="/organizations">
+                <Button variant="outline">
+                  <ArrowUpRight className="size-4" />
+                  Ir a organizaciones
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       ) : isLoading ? (
-        <LoadingSpinner />
+        <EventsListSkeleton />
       ) : !events || events.length === 0 ? (
-        <EmptyState
-          title="Sin eventos"
-          description="No hay eventos en esta organización."
-        />
+        <Card>
+          <CardContent className="p-12 text-center">
+            <CalendarDays className="mx-auto mb-4 size-12 text-text-muted" />
+            <h3 className="text-lg font-display font-semibold text-text-primary">
+              Sin eventos
+            </h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              No hay eventos en esta organización.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="space-y-3">
-          {events.map((event) => (
-            <Link
-              key={event.id}
-              href={`/events/${event.id}`}
-              className="panel p-5 flex items-center justify-between hover:border-rideflow-amber/50 transition group"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="font-display font-semibold group-hover:text-rideflow-amber transition">
-                    {event.title}
-                  </h3>
-                  <StatusBadge status={event.status} />
-                </div>
-                <p className="text-sm text-rideflow-muted">
-                  {new Date(event.date).toLocaleDateString('es', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </p>
-                <p className="text-sm text-rideflow-muted2">
-                  {event.origin} → {event.destination}
-                </p>
-              </div>
-              <div className="text-right shrink-0 ml-4">
-                <p className="text-sm font-medium">{event.capacity} plazas</p>
-                {event.driver && (
-                  <p className="text-xs text-rideflow-muted2">{event.driver.name}</p>
-                )}
-              </div>
-            </Link>
-          ))}
+        <div className="flex flex-col gap-3">
+          {events.map((event) => {
+            const eventDate = new Date(event.date);
+            return (
+              <Link key={event.id} href={`/events/${event.id}`} className="block">
+                <Card className="transition hover:border-primary/50">
+                  <CardContent className="flex items-center justify-between p-5">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-3">
+                        <h3 className="font-display font-semibold text-text-primary transition group-hover:text-primary">
+                          {event.title}
+                        </h3>
+                        <Badge variant={statusToBadge(event.status)}>
+                          {event.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-text-secondary">
+                        {eventDate.toLocaleDateString('es', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <p className="text-sm text-text-muted">
+                        {event.origin} → {event.destination}
+                      </p>
+                    </div>
+                    <div className="ml-4 shrink-0 text-right">
+                      <p className="text-sm font-medium">{event.capacity} plazas</p>
+                      {event.driver && (
+                        <p className="text-xs text-text-muted">{event.driver.name}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </PageContainer>
   );
+}
+
+function statusToBadge(
+  status: string,
+): 'default' | 'success' | 'warning' | 'error' | 'info' | 'outline' {
+  switch (status) {
+    case 'DRAFT':
+      return 'outline';
+    case 'PUBLISHED':
+      return 'info';
+    case 'OPEN':
+      return 'success';
+    case 'CLOSED':
+      return 'warning';
+    case 'FINISHED':
+      return 'default';
+    default:
+      return 'outline';
+  }
 }

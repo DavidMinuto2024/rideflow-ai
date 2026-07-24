@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 
-export interface TripPassenger {
+export interface TripPassengerAssignment {
   id: string;
   passenger: { id: string; name: string; email: string };
+  estimatedPickupTime?: string;
+  pickupOrder?: number;
 }
 
 export interface Trip {
@@ -11,12 +13,19 @@ export interface Trip {
   eventId: string;
   driverId: string;
   vehicleId: string;
+  origin?: string | null;
+  originLat?: number | null;
+  originLng?: number | null;
+  dest?: string | null;
+  destLat?: number | null;
+  destLng?: number | null;
   distance?: number;
   duration?: number;
   routeGeometry?: string;
+  estimatedDepartureTime?: string;
   driver?: { id: string; name: string; email: string };
   vehicle?: { id: string; plate?: string; model?: string; capacity?: number };
-  assignments?: TripPassenger[];
+  assignments?: TripPassengerAssignment[];
 }
 
 export interface TripRoute {
@@ -41,10 +50,18 @@ export function useTrip(eventId: string, tripId: string) {
   });
 }
 
-export function useTripRoute(eventId: string, tripId: string) {
+export function useTripRoute(
+  eventId: string,
+  tripId: string,
+  waypoints?: Array<{ lat: number; lng: number }>,
+) {
+  const qp = waypoints && waypoints.length > 0
+    ? `?waypoints=${waypoints.map((wp) => `${wp.lat},${wp.lng}`).join(';')}`
+    : '';
+
   return useQuery<TripRoute>({
-    queryKey: ['events', eventId, 'trips', tripId, 'route'],
-    queryFn: () => apiClient.get<TripRoute>(`/events/${eventId}/trips/${tripId}/route`),
+    queryKey: ['events', eventId, 'trips', tripId, 'route', waypoints],
+    queryFn: () => apiClient.get<TripRoute>(`/events/${eventId}/trips/${tripId}/route${qp}`),
     enabled: !!eventId && !!tripId,
   });
 }

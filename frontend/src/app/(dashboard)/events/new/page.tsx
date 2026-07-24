@@ -2,9 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { useOrganizations } from '@/lib/queries/organizations';
 import { useCreateEvent } from '@/lib/queries/events';
 import { PageContainer } from '@/components/PageContainer';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { FormField } from '@/components/ui/FormField';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiError } from '@/lib/api';
 
 export default function NewEventPage() {
@@ -44,7 +51,7 @@ export default function NewEventPage() {
         capacity,
         description: description || undefined,
       });
-      router.push(`/events`);
+      router.push('/events');
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -61,155 +68,140 @@ export default function NewEventPage() {
       title="Nuevo evento"
       description="Crea un evento de carpooling"
     >
-      <div className="panel p-6 max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Organization selector */}
-          <div>
-            <label className="block text-sm font-medium text-rideflow-muted mb-1">
-              Organización
-            </label>
-            {orgsLoading ? (
-              <div className="h-10 bg-rideflow-panel2 rounded-lg animate-pulse" />
-            ) : (
-              <select
-                value={orgId}
-                onChange={(e) => setOrgId(e.target.value)}
+      <Card className="max-w-2xl">
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            {/* Organization selector */}
+            <FormField label="Organización" id="orgId">
+              {orgsLoading ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <Select
+                  id="orgId"
+                  value={orgId}
+                  onChange={(e) => setOrgId(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona una organización</option>
+                  {orgs?.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </FormField>
+
+            <FormField label="Título" id="title">
+              <Input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
+                placeholder="Viaje a la oficina"
+              />
+            </FormField>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Fecha" id="date">
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  min={today}
+                />
+              </FormField>
+              <FormField label="Hora" id="time">
+                <Input
+                  id="time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Origen" id="origin">
+                <Input
+                  id="origin"
+                  type="text"
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value)}
+                  required
+                  placeholder="Dirección de salida"
+                />
+              </FormField>
+              <FormField label="Destino" id="destination">
+                <Input
+                  id="destination"
+                  type="text"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  required
+                  placeholder="Dirección de llegada"
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Capacidad (plazas)" id="capacity">
+                <Input
+                  id="capacity"
+                  type="number"
+                  value={capacity}
+                  onChange={(e) =>
+                    setCapacity(Math.max(1, parseInt(e.target.value) || 1))
+                  }
+                  min={1}
+                  max={20}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Descripción (opcional)" id="description">
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="flex w-full rounded-md border bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 resize-none"
+                placeholder="Detalles adicionales del viaje..."
+              />
+            </FormField>
+
+            {error && (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5"
               >
-                <option value="">Selecciona una organización</option>
-                {orgs?.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
             )}
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-rideflow-muted mb-1">
-              Título
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
-              placeholder="Viaje a la oficina"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-rideflow-muted mb-1">
-                Fecha
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                min={today}
-                className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
-              />
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="submit"
+                loading={createEvent.isPending}
+                disabled={!orgId}
+              >
+                Crear evento
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+              >
+                <ArrowLeft className="size-4" />
+                Cancelar
+              </Button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-rideflow-muted mb-1">
-                Hora
-              </label>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-rideflow-muted mb-1">
-                Origen
-              </label>
-              <input
-                type="text"
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
-                placeholder="Dirección de salida"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-rideflow-muted mb-1">
-                Destino
-              </label>
-              <input
-                type="text"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
-                placeholder="Dirección de llegada"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-rideflow-muted mb-1">
-                Capacidad (plazas)
-              </label>
-              <input
-                type="number"
-                value={capacity}
-                onChange={(e) => setCapacity(Math.max(1, parseInt(e.target.value) || 1))}
-                min={1}
-                max={20}
-                className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-rideflow-muted mb-1">
-              Descripción (opcional)
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2.5 bg-rideflow-panel2 border border-rideflow-border rounded-lg text-rideflow-text focus:outline-none focus:border-rideflow-amber resize-none"
-              placeholder="Detalles adicionales del viaje..."
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2.5">
-              <p className="text-red-400 text-sm">{error}</p>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={createEvent.isPending || !orgId}
-              className="px-6 py-2.5 bg-rideflow-amber text-rideflow-bg font-semibold rounded-lg hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {createEvent.isPending ? 'Creando...' : 'Crear evento'}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-6 py-2.5 border border-rideflow-border rounded-lg text-rideflow-muted hover:text-rideflow-text transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </div>
+          </form>
+        </CardContent>
+      </Card>
     </PageContainer>
   );
 }

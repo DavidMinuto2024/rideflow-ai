@@ -77,6 +77,22 @@ function decodePolyline(encoded: string): [number, number][] {
   }
 }
 
+function createWaypointIcon(color: string) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.3)"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+interface MapWaypoint {
+  lat: number;
+  lng: number;
+  label: string;
+  color: string;
+}
+
 interface MapViewProps {
   center?: [number, number];
   zoom?: number;
@@ -88,6 +104,8 @@ interface MapViewProps {
   routeGeometry?: string;
   originLabel?: string;
   destLabel?: string;
+  /** Additional waypoints to show as markers (driver start, passenger pickup, etc.) */
+  waypoints?: MapWaypoint[];
 }
 
 export default function MapView({
@@ -101,6 +119,7 @@ export default function MapView({
   routeGeometry,
   originLabel,
   destLabel,
+  waypoints = [],
 }: MapViewProps) {
   useEffect(() => {
     // Force re-render after mount (fixes SSR hydration)
@@ -135,8 +154,11 @@ export default function MapView({
     if (hasOrigin) pts.push([originLat!, originLng!]);
     if (hasDest) pts.push([destLat!, destLng!]);
     if (routePositions.length > 0) pts.push(...routePositions);
+    for (const wp of waypoints) {
+      pts.push([wp.lat, wp.lng]);
+    }
     return pts.length > 0 ? L.latLngBounds(pts.map((p) => L.latLng(p[0], p[1]))) : null;
-  }, [hasOrigin, hasDest, originLat, originLng, destLat, destLng, routePositions]);
+  }, [hasOrigin, hasDest, originLat, originLng, destLat, destLng, routePositions, waypoints]);
 
   // effective center: bounds center if we have points, else default
   const effectiveCenter: [number, number] =
@@ -164,6 +186,12 @@ export default function MapView({
           <Popup>{originLabel || 'Origen'}</Popup>
         </Marker>
       )}
+
+      {waypoints.map((wp, idx) => (
+        <Marker key={`wp-${idx}`} position={[wp.lat, wp.lng]} icon={createWaypointIcon(wp.color)}>
+          <Popup>{wp.label}</Popup>
+        </Marker>
+      ))}
 
       {hasDest && (
         <Marker position={[destLat!, destLng!]} icon={destIcon}>

@@ -22,6 +22,22 @@ export interface Event {
   vehicleId?: string;
   vehicle?: { id: string; plate?: string; model?: string };
   createdAt: string;
+  // Gap Analysis fields
+  arrivalTime?: string;
+  inviteToken?: string;
+  inviteTokenExpiresAt?: string;
+  qrCodeSvg?: string;
+  eventVehicles?: Array<{
+    id: string;
+    vehicleId: string;
+    vehicle?: { plate?: string; model?: string };
+    driverId: string;
+    driver?: { name: string };
+    startLocation?: string;
+    startLat?: number;
+    startLng?: number;
+    picoYPlaca: boolean;
+  }>;
 }
 
 const VALID_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
