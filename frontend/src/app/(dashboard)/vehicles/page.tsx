@@ -2,10 +2,33 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Car, Plus, Filter } from 'lucide-react';
 import { useOrganizations } from '@/lib/queries/organizations';
 import { useVehicles } from '@/lib/queries/vehicles';
-import { PageContainer, StatusBadge, EmptyState } from '@/components/PageContainer';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { PageContainer } from '@/components/PageContainer';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+
+function VehiclesSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[1, 2, 3].map((i) => (
+        <Card key={i}>
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <Skeleton className="size-10 rounded-lg" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="mb-2 h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 export default function VehiclesPage() {
   const { data: orgs } = useOrganizations();
@@ -20,11 +43,11 @@ export default function VehiclesPage() {
       title="Vehículos"
       description="Registro de vehículos por organización"
       action={
-        <Link
-          href={`/vehicles/new${effectiveOrgId ? `?orgId=${effectiveOrgId}` : ''}`}
-          className="px-4 py-2 bg-rideflow-amber text-rideflow-bg font-semibold rounded-lg hover:brightness-110 transition text-sm"
-        >
-          Nuevo vehículo
+        <Link href={`/vehicles/new${effectiveOrgId ? `?orgId=${effectiveOrgId}` : ''}`}>
+          <Button size="sm">
+            <Plus className="size-4" />
+            Nuevo
+          </Button>
         </Link>
       }
     >
@@ -33,24 +56,22 @@ export default function VehiclesPage() {
         <div className="flex items-center gap-3 flex-wrap">
           {orgs.length > 1 &&
             orgs.map((org) => (
-              <button
+              <Button
                 key={org.id}
+                size="sm"
+                variant={(selectedOrg || orgs[0]?.id) === org.id ? 'default' : 'outline'}
                 onClick={() => setSelectedOrg(org.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                  (selectedOrg || orgs[0]?.id) === org.id
-                    ? 'bg-rideflow-amber/10 text-rideflow-amber border border-rideflow-amber/30'
-                    : 'bg-rideflow-panel text-rideflow-muted border border-rideflow-border hover:text-rideflow-text'
-                }`}
               >
+                <Filter className="size-3.5" />
                 {org.name}
-              </button>
+              </Button>
             ))}
-          <label className="flex items-center gap-2 text-sm text-rideflow-muted ml-auto">
+          <label className="ml-auto flex items-center gap-2 text-sm text-text-secondary">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="rounded bg-rideflow-panel2 border-rideflow-border"
+              className="rounded border-border bg-surface-hover accent-primary"
             />
             Mostrar inactivos
           </label>
@@ -58,45 +79,61 @@ export default function VehiclesPage() {
       )}
 
       {!effectiveOrgId ? (
-        <EmptyState
-          title="Selecciona una organización"
-          description="Necesitas pertenecer a una organización para ver sus vehículos."
-        />
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Car className="mx-auto mb-3 size-10 text-text-muted" />
+            <h3 className="mb-1 font-display font-semibold">Selecciona una organización</h3>
+            <p className="text-sm text-text-secondary">
+              Necesitas pertenecer a una organización para ver sus vehículos.
+            </p>
+          </CardContent>
+        </Card>
       ) : isLoading ? (
-        <LoadingSpinner />
+        <VehiclesSkeleton />
       ) : !vehicles || vehicles.length === 0 ? (
-        <EmptyState
-          title="Sin vehículos"
-          description="No hay vehículos registrados en esta organización."
-        />
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Car className="mx-auto mb-3 size-10 text-text-muted" />
+            <h3 className="mb-1 font-display font-semibold">Sin vehículos</h3>
+            <p className="mb-4 text-sm text-text-secondary">
+              No hay vehículos registrados en esta organización.
+            </p>
+            <Link href={`/vehicles/new?orgId=${effectiveOrgId}`}>
+              <Button>
+                <Plus className="size-4" />
+                Nuevo vehículo
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {vehicles.map((v) => (
-            <Link
-              key={v.id}
-              href={`/vehicles/${v.id}`}
-              className="panel p-5 hover:border-rideflow-amber/50 transition group"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-rideflow-amber/10 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-rideflow-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                  </svg>
-                </div>
-                <StatusBadge status={v.isActive ? 'ACTIVE' : 'INACTIVE'} />
-              </div>
-              <h3 className="font-display font-semibold group-hover:text-rideflow-amber transition">
-                {v.model || 'Vehículo'}
-              </h3>
-              <div className="mt-2 text-sm space-y-1">
-                {v.plate && (
-                  <p className="text-rideflow-muted2 font-mono">{v.plate}</p>
-                )}
-                <p className="text-rideflow-muted">{v.capacity} plazas</p>
-                {v.driver && (
-                  <p className="text-rideflow-muted2">Conductor: {v.driver.name}</p>
-                )}
-              </div>
+            <Link key={v.id} href={`/vehicles/${v.id}`}>
+              <Card className="h-full transition hover:ring-2 hover:ring-primary/40">
+                <CardContent className="p-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                      <Car className="size-5 text-primary" />
+                    </div>
+                    <Badge variant={v.isActive ? 'success' : 'default'}>
+                      {v.isActive ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </div>
+                  <h3 className="font-display font-semibold">
+                    {v.model || 'Vehículo'}
+                  </h3>
+                  <div className="mt-2 space-y-1 text-sm">
+                    {v.plate && (
+                      <p className="font-mono text-text-muted">{v.plate}</p>
+                    )}
+                    <p className="text-text-secondary">{v.capacity} plazas</p>
+                    {v.driver && (
+                      <p className="text-text-muted">Conductor: {v.driver.name}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </Link>
           ))}
         </div>
