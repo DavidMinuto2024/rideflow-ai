@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/Card';
+import { GlassCard } from '@/components/ui/aceternity/GlassCard';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function AuthCallbackPage() {
   if (error) {
     return (
       <div className="flex min-h-[80vh] items-center justify-center px-4">
-        <Card className="w-full max-w-md">
+        <GlassCard glow className="w-full max-w-md p-0">
           <CardContent className="p-8 text-center">
             <XCircle className="mx-auto mb-4 size-12 text-destructive" />
             <h1 className="mb-2 text-xl font-display font-bold">
@@ -54,7 +55,7 @@ export default function AuthCallbackPage() {
             </h1>
             <p className="text-text-secondary">{error}</p>
           </CardContent>
-        </Card>
+        </GlassCard>
       </div>
     );
   }

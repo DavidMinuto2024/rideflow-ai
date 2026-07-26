@@ -101,7 +101,7 @@ export default function MembersPage() {
       }
     >
       {!members || members.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <Users className="mx-auto mb-2 size-8 text-text-muted" />
             <p className="text-sm text-text-secondary">
@@ -110,7 +110,7 @@ export default function MembersPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card glass className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

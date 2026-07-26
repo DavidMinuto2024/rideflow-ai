@@ -79,7 +79,7 @@ export default function VehiclesPage() {
       )}
 
       {!effectiveOrgId ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <Car className="mx-auto mb-3 size-10 text-text-muted" />
             <h3 className="mb-1 font-display font-semibold">Selecciona una organización</h3>
@@ -91,7 +91,7 @@ export default function VehiclesPage() {
       ) : isLoading ? (
         <VehiclesSkeleton />
       ) : !vehicles || vehicles.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <Car className="mx-auto mb-3 size-10 text-text-muted" />
             <h3 className="mb-1 font-display font-semibold">Sin vehículos</h3>
@@ -110,8 +110,8 @@ export default function VehiclesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {vehicles.map((v) => (
             <Link key={v.id} href={`/vehicles/${v.id}`}>
-              <Card className="h-full transition hover:ring-2 hover:ring-primary/40">
-                <CardContent className="p-5">
+              <Card glass className="h-full transition hover:ring-2 hover:ring-primary/40">
+                  <CardContent className="p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
                       <Car className="size-5 text-primary" />

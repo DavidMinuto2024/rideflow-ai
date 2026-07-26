@@ -32,7 +32,7 @@ export default function RequestRidePage() {
   if (!event) {
     return (
       <PageContainer title="Solicitar Viaje">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="text-destructive">Evento no encontrado</p>
             <div className="mt-4">
@@ -52,7 +52,7 @@ export default function RequestRidePage() {
   if (event.status !== 'OPEN') {
     return (
       <PageContainer title="Solicitar Viaje">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="mb-2 text-warning">
               Este evento no está aceptando solicitudes actualmente.
@@ -100,7 +100,7 @@ export default function RequestRidePage() {
       }
     >
       {success ? (
-        <Card className="max-w-lg">
+        <Card glass className="max-w-lg">
           <CardContent className="p-8 text-center">
             <CheckCircle2 className="mx-auto mb-4 size-12 text-success" />
             <h2 className="mb-1 text-xl font-display font-semibold">
@@ -121,7 +121,7 @@ export default function RequestRidePage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="max-w-lg">
+        <Card glass className="max-w-lg">
           <CardContent className="p-6">
             <div className="mb-6 flex flex-col gap-3 text-sm">
               <div className="flex justify-between">

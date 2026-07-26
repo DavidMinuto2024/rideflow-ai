@@ -55,6 +55,10 @@ const config: Config = {
         'slide-down': 'slide-down 0.2s ease-out',
         'scale-in': 'scale-in 0.2s ease-out',
         'spin-slow': 'spin 2s linear infinite',
+        shimmer: 'shimmer 3s ease-in-out infinite',
+        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
+        'beam-drift': 'beam-drift 8s ease-in-out infinite',
+        'border-rotate': 'border-rotate 4s linear infinite',
       },
       keyframes: {
         'skeleton-pulse': {
@@ -80,6 +84,22 @@ const config: Config = {
         'scale-in': {
           from: { opacity: '0', transform: 'scale(0.95)' },
           to: { opacity: '1', transform: 'scale(1)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { boxShadow: '0 0 8px rgb(34 211 238 / 0.3)' },
+          '50%': { boxShadow: '0 0 20px rgb(34 211 238 / 0.6)' },
+        },
+        'beam-drift': {
+          '0%, 100%': { transform: 'translateX(-10%) translateY(-10%)' },
+          '50%': { transform: 'translateX(10%) translateY(10%)' },
+        },
+        'border-rotate': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
         },
       },
     },

@@ -75,7 +75,7 @@ export default function EventDetailPage() {
   if (error || !event) {
     return (
       <PageContainer title="Evento">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="text-destructive">Error al cargar el evento</p>
             <div className="mt-4">
@@ -124,7 +124,7 @@ export default function EventDetailPage() {
       }
     >
       {/* Status + Actions */}
-      <Card>
+      <Card glass>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
           <div className="flex items-center gap-3">
             <Badge variant={statusToBadge(event.status)}>{event.status}</Badge>
@@ -185,7 +185,7 @@ export default function EventDetailPage() {
       {/* Details grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="flex flex-col gap-4">
-          <Card>
+          <Card glass>
             <CardContent className="p-5">
               <h3 className="mb-4 font-display font-semibold">Detalles</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -245,7 +245,7 @@ export default function EventDetailPage() {
 
           {/* EventVehicles registered */}
           {event.eventVehicles && event.eventVehicles.length > 0 && (
-            <Card>
+            <Card glass>
               <CardContent className="p-5">
                 <h3 className="mb-3 font-display font-semibold">
                   Vehículos registrados ({event.eventVehicles.length})
@@ -281,14 +281,14 @@ export default function EventDetailPage() {
         {/* Map */}
         <div>
           {hasCoords ? (
-            <Card className="overflow-hidden">
+            <Card glass className="overflow-hidden">
               <MapView
                 center={[event.originLat!, event.originLng!]}
                 zoom={14}
               />
             </Card>
           ) : (
-            <Card>
+            <Card glass>
               <CardContent className="p-8 text-center">
                 <p className="text-sm text-text-secondary">
                   No hay coordenadas disponibles para mostrar en el mapa.

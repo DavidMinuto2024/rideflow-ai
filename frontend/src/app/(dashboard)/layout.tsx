@@ -86,7 +86,7 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-rideflow-panel border-r border-rideflow-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-rideflow-panel/60 backdrop-blur-[12px] border-r border-rideflow-border/50 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -110,7 +110,7 @@ export default function DashboardLayout({
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   isActive(item.href)
-                    ? 'bg-rideflow-amber/10 text-rideflow-amber'
+                    ? 'bg-rideflow-amber/10 text-rideflow-amber shadow-[0_0_12px_rgb(232_163_61/0.2)]'
                     : 'text-rideflow-muted hover:text-rideflow-text hover:bg-rideflow-panel2'
                 }`}
               >
@@ -126,7 +126,7 @@ export default function DashboardLayout({
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   isActive('/notifications')
-                    ? 'bg-rideflow-amber/10 text-rideflow-amber'
+                    ? 'bg-rideflow-amber/10 text-rideflow-amber shadow-[0_0_12px_rgb(232_163_61/0.2)]'
                     : 'text-rideflow-muted hover:text-rideflow-text hover:bg-rideflow-panel2'
                 }`}
               >

@@ -55,7 +55,7 @@ export default function NewVehiclePage() {
       title="Nuevo vehículo"
       description="Registra un vehículo en una organización"
     >
-      <Card className="max-w-lg">
+      <Card glass className="max-w-lg">
         <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

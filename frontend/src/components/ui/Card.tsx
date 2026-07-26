@@ -1,13 +1,24 @@
 import { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
-const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+export interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  /** Apply glassmorphism (backdrop-blur + semi-transparent bg). */
+  glass?: boolean;
+  /** Apply glow shadow on hover. */
+  glow?: boolean;
+}
+
+const Card = forwardRef<HTMLDivElement, CardProps>(
+  ({ className, glass, glow, ...props }, ref) => (
     <div
       ref={ref}
       data-slot="card"
       className={cn(
         'rounded-xl border bg-surface text-text-primary shadow-sm',
+        glass &&
+          'bg-surface/60 backdrop-blur-[12px] border-border/50',
+        glow &&
+          'glow transition-shadow duration-300 hover:shadow-[0_0_20px_rgb(34_211_238/0.3)]',
         className,
       )}
       {...props}

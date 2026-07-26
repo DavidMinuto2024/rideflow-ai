@@ -61,7 +61,7 @@ function EditVehicleForm({
   };
 
   return (
-    <Card>
+    <Card glass>
       <CardContent className="p-5">
         <h3 className="mb-4 font-display font-semibold">Editar vehículo</h3>
         <form onSubmit={handleSubmit} className="max-w-md space-y-4">
@@ -130,7 +130,7 @@ export default function VehicleDetailPage() {
   if (error || !vehicle) {
     return (
       <PageContainer title="Vehículo">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="text-destructive">Error al cargar el vehículo</p>
             <div className="mt-4">
@@ -188,7 +188,7 @@ export default function VehicleDetailPage() {
       }
     >
       {/* Actions bar */}
-      <Card>
+      <Card glass>
         <CardContent className="p-5">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
@@ -270,7 +270,7 @@ export default function VehicleDetailPage() {
       </Modal>
 
       {/* Details */}
-      <Card>
+      <Card glass>
         <CardContent className="p-5">
           <h3 className="mb-4 font-display font-semibold">Detalles</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">

@@ -83,6 +83,156 @@
   }
 }
 
+@layer utilities {
+  /* Dot background pattern — repeating dots */
+  .dot-bg {
+    background-image: radial-gradient(
+      circle,
+      rgb(34 211 238 / 0.15) 1px,
+      transparent 1px
+    );
+    background-size: 24px 24px;
+  }
+
+  /* Grid background pattern — repeating grid lines */
+  .grid-bg {
+    background-image:
+      linear-gradient(
+        to right,
+        rgb(34 211 238 / 0.08) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        rgb(34 211 238 / 0.08) 1px,
+        transparent 1px
+      );
+    background-size: 24px 24px;
+  }
+
+  /* Glass surface with backdrop blur */
+  .glass {
+    background-color: rgb(19 27 46 / 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgb(42 58 92 / 0.5);
+  }
+
+  /* Opaque fallback when backdrop-filter is unsupported */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass {
+      background-color: rgb(19 27 46 / 0.95);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  /* Beams container — gradient rays background */
+  .beams {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .beams::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg,
+      var(--beam-from, #22d3ee) 60deg,
+      var(--beam-to, #e8a33d) 120deg,
+      transparent 180deg,
+      var(--beam-from, #22d3ee) 240deg,
+      var(--beam-to, #e8a33d) 300deg,
+      transparent 360deg
+    );
+    animation: beam-drift 8s ease-in-out infinite;
+    opacity: 0.15;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .beams.intensity-medium::before {
+    opacity: 0.25;
+  }
+
+  .beams.intensity-strong::before {
+    opacity: 0.35;
+  }
+
+  .beams.reduce-motion::before {
+    animation: none;
+  }
+
+  /* Gradient text with shimmer */
+  .gradient-text {
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: linear-gradient(
+      to right,
+      var(--gradient-from, #22d3ee),
+      var(--gradient-to, #e8a33d)
+    );
+    background-size: 100% 100%;
+  }
+
+  .gradient-text.shimmer {
+    background-size: 200% 100%;
+    background-image: linear-gradient(
+      to right,
+      var(--gradient-from, #22d3ee) 0%,
+      var(--gradient-to, #e8a33d) 25%,
+      var(--gradient-from, #22d3ee) 50%,
+      var(--gradient-to, #e8a33d) 75%,
+      var(--gradient-from, #22d3ee) 100%
+    );
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  .gradient-text.reduce-motion,
+  .gradient-text.reduce-motion.shimmer {
+    animation: none;
+    background-size: 100% 100%;
+  }
+
+  /* Animated gradient border — ::before conic-gradient rotation */
+  .animated-border {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+
+  .animated-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(
+      from 0deg,
+      var(--border-from, #22d3ee),
+      var(--border-to, #e8a33d),
+      var(--border-from, #22d3ee)
+    );
+    animation: border-rotate 4s linear infinite;
+    z-index: -1;
+  }
+
+  .animated-border::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    background: rgb(19 27 46);
+    border-radius: inherit;
+    z-index: -1;
+  }
+
+  .animated-border.reduce-motion::before {
+    animation: none;
+  }
+}
+
 /* Leaflet dark theme overrides */
 .leaflet-container {
   background: #0b1121;

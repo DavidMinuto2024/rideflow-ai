@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { GradientText } from '@/components/ui/aceternity/GradientText';
 import { ApiError } from '@/lib/api';
 
 function OrgDetailSkeleton() {
@@ -57,7 +58,7 @@ function EditOrganizationForm({
   };
 
   return (
-    <Card className="mb-6">
+    <Card glass className="mb-6">
       <CardContent className="p-6">
         <h3 className="mb-4 font-display font-semibold">Editar organización</h3>
         <form onSubmit={handleSubmit} className="max-w-md space-y-4">
@@ -104,7 +105,7 @@ export default function OrganizationDetailPage() {
   if (error || !org) {
     return (
       <PageContainer title="Organización">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="text-destructive">Error al cargar la organización</p>
             <div className="mt-4">
@@ -147,7 +148,7 @@ export default function OrganizationDetailPage() {
       )}
 
       {/* Info panel */}
-      <Card>
+      <Card glass>
         <CardContent className="p-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
@@ -171,10 +172,10 @@ export default function OrganizationDetailPage() {
       {/* Events */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-lg font-display font-semibold">
+          <GradientText as="h2" shimmer={false} className="flex items-center gap-2 text-lg font-display font-semibold">
             <CalendarDays className="size-5 text-primary" />
             Eventos
-          </h2>
+          </GradientText>
           <Link href={`/events/new?orgId=${id}`}>
             <Button variant="link" size="sm">
               Nuevo evento
@@ -183,7 +184,7 @@ export default function OrganizationDetailPage() {
           </Link>
         </div>
         {!events || events.length === 0 ? (
-          <Card>
+          <Card glass>
             <CardContent className="p-8 text-center">
               <CalendarDays className="mx-auto mb-2 size-8 text-text-muted" />
               <p className="text-sm text-text-secondary">Sin eventos. Crea el primero.</p>
@@ -193,7 +194,7 @@ export default function OrganizationDetailPage() {
           <div className="space-y-2">
             {events.slice(0, 5).map((event) => (
               <Link key={event.id} href={`/events/${event.id}`}>
-                <Card className="transition hover:ring-2 hover:ring-primary/40">
+                <Card glass className="transition hover:ring-2 hover:ring-primary/40">
                   <CardContent className="flex items-center justify-between p-4">
                     <div>
                       <p className="font-medium">{event.title}</p>
@@ -215,10 +216,10 @@ export default function OrganizationDetailPage() {
       {/* Vehicles */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-lg font-display font-semibold">
+          <GradientText as="h2" shimmer={false} className="flex items-center gap-2 text-lg font-display font-semibold">
             <Car className="size-5 text-primary" />
             Vehículos
-          </h2>
+          </GradientText>
           <Link href={`/vehicles/new?orgId=${id}`}>
             <Button variant="link" size="sm">
               Nuevo vehículo
@@ -227,7 +228,7 @@ export default function OrganizationDetailPage() {
           </Link>
         </div>
         {!vehicles || vehicles.length === 0 ? (
-          <Card>
+          <Card glass>
             <CardContent className="p-8 text-center">
               <Car className="mx-auto mb-2 size-8 text-text-muted" />
               <p className="text-sm text-text-secondary">Sin vehículos. Registra el primero.</p>
@@ -237,7 +238,7 @@ export default function OrganizationDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {vehicles.slice(0, 4).map((v) => (
               <Link key={v.id} href={`/vehicles/${v.id}`}>
-                <Card className="transition hover:ring-2 hover:ring-primary/40">
+                <Card glass className="transition hover:ring-2 hover:ring-primary/40">
                   <CardContent className="p-4">
                     <div className="mb-1 flex items-center justify-between">
                       <p className="font-medium">{v.model || v.plate || 'Vehículo'}</p>

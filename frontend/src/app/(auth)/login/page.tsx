@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { Card, CardContent } from '@/components/ui/Card';
+import { GlassCard } from '@/components/ui/aceternity/GlassCard';
+import { GradientText } from '@/components/ui/aceternity/GradientText';
 import { useFormField } from '@/hooks/useFormField';
 
 const validateEmail = (v: string) =>
@@ -78,12 +80,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] px-4">
-      <Card className="w-full max-w-md">
+      <GlassCard glow className="w-full max-w-md p-0">
         <CardContent className="p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-display font-bold">
+            <GradientText as="h1" shimmer={false} className="text-2xl font-display font-bold">
               Iniciar sesión
-            </h1>
+            </GradientText>
             <p className="mt-2 text-sm text-text-secondary">
               Accede a tu cuenta de RideFlow
             </p>
@@ -151,7 +153,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" loading={loading} className="w-full">
+            <Button type="submit" variant="glow-primary" loading={loading} className="w-full">
               Entrar
             </Button>
           </form>
@@ -205,7 +207,7 @@ export default function LoginPage() {
             </Link>
           </p>
         </CardContent>
-      </Card>
+      </GlassCard>
     </div>
   );
 }

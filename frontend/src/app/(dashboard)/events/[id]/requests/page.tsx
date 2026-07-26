@@ -92,7 +92,7 @@ export default function EventRequestsPage() {
       )}
 
       {assignSuccess && (
-        <Card className="border-success/30 bg-success/5">
+        <Card glass className="border-success/30 bg-success/5">
           <CardContent className="p-3 text-sm text-success">
             Asignación completada exitosamente.
           </CardContent>
@@ -100,7 +100,7 @@ export default function EventRequestsPage() {
       )}
 
       {!requests || requests.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-12 text-center">
             <ClipboardList className="mx-auto mb-4 size-12 text-text-muted" />
             <h3 className="text-lg font-display font-semibold text-text-primary">
@@ -112,7 +112,7 @@ export default function EventRequestsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card glass className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

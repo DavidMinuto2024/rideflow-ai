@@ -72,7 +72,7 @@ export default function NotificationsPage() {
       description="Tus notificaciones y alertas"
     >
       {!notifications || notifications.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <Bell className="mx-auto mb-3 size-12 text-text-muted" />
             <h3 className="mb-1 font-display font-semibold">Sin notificaciones</h3>
@@ -93,6 +93,7 @@ export default function NotificationsPage() {
             return (
               <Card
                 key={n.id}
+                glass
                 className={`transition ${
                   !n.read
                     ? 'border-l-2 border-l-primary bg-primary/[0.02]'

@@ -61,7 +61,7 @@ export default function EventsPage() {
       )}
 
       {!effectiveOrgId ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-12 text-center">
             <CalendarDays className="mx-auto mb-4 size-12 text-text-muted" />
             <h3 className="text-lg font-display font-semibold text-text-primary">
@@ -83,7 +83,7 @@ export default function EventsPage() {
       ) : isLoading ? (
         <EventsListSkeleton />
       ) : !events || events.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-12 text-center">
             <CalendarDays className="mx-auto mb-4 size-12 text-text-muted" />
             <h3 className="text-lg font-display font-semibold text-text-primary">
@@ -100,7 +100,7 @@ export default function EventsPage() {
             const eventDate = new Date(event.date);
             return (
               <Link key={event.id} href={`/events/${event.id}`} className="block">
-                <Card className="transition hover:border-primary/50">
+                <Card glass className="transition hover:border-primary/50">
                   <CardContent className="flex items-center justify-between p-5">
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center gap-3">

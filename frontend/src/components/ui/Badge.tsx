@@ -1,4 +1,4 @@
-import { type HTMLAttributes } from 'react';
+import { forwardRef, type HTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,8 @@ const badgeVariants = cva(
         error: 'border-transparent bg-destructive/15 text-destructive',
         info: 'border-transparent bg-secondary/15 text-secondary',
         outline: 'text-text-secondary',
+        shimmer:
+          'border-transparent bg-gradient-to-r from-primary/10 via-primary/30 to-primary/10 bg-[length:200%_100%] animate-shimmer text-primary',
       },
     },
     defaultVariants: {
@@ -25,10 +27,17 @@ export interface BadgeProps
   extends HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
-  );
-}
+const Badge = forwardRef<HTMLDivElement, BadgeProps>(
+  ({ className, variant, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(badgeVariants({ variant }), className)}
+        {...props}
+      />
+    );
+  },
+);
+Badge.displayName = 'Badge';
 
 export { Badge, badgeVariants };

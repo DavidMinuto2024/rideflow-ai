@@ -53,7 +53,7 @@ function CreateOrganizationForm({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Card className="mb-6">
+    <Card glass className="mb-6">
       <CardContent className="p-6">
         <h3 className="mb-4 font-display text-lg font-semibold">
           Nueva organización
@@ -115,7 +115,7 @@ export default function OrganizationsPage() {
   if (error) {
     return (
       <PageContainer title="Organizaciones">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="text-destructive">Error al cargar organizaciones</p>
           </CardContent>
@@ -138,7 +138,7 @@ export default function OrganizationsPage() {
       {showCreate && <CreateOrganizationForm onClose={() => setShowCreate(false)} />}
 
       {!orgs || orgs.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <Building2 className="mx-auto mb-3 size-10 text-text-muted" />
             <h3 className="mb-1 font-display font-semibold">No hay organizaciones</h3>
@@ -155,7 +155,7 @@ export default function OrganizationsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {orgs.map((org) => (
             <Link key={org.id} href={`/organizations/${org.id}`}>
-              <Card className="h-full transition hover:ring-2 hover:ring-primary/40">
+              <Card glass className="h-full transition hover:ring-2 hover:ring-primary/40">
                 <CardContent className="p-5">
                   <div className="mb-3 flex size-12 items-center justify-center rounded-lg bg-primary/10">
                     <Building2 className="size-6 text-primary" />

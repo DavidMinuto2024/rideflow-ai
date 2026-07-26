@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { Card, CardContent } from '@/components/ui/Card';
+import { GlassCard } from '@/components/ui/aceternity/GlassCard';
+import { GradientText } from '@/components/ui/aceternity/GradientText';
 import { useFormField } from '@/hooks/useFormField';
 
 const validateName = (v: string) =>
@@ -34,7 +36,7 @@ const validatePassword = (v: string) =>
 
 function SuccessState({ email }: { email: string }) {
   return (
-    <Card className="w-full max-w-md">
+    <GlassCard glow className="w-full max-w-md p-0">
       <CardContent className="p-8 text-center">
         <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10">
           <Mail className="size-8 text-primary" />
@@ -53,7 +55,7 @@ function SuccessState({ email }: { email: string }) {
           </Link>
         </p>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }
 
@@ -111,10 +113,12 @@ export default function SignupPage() {
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] px-4">
-      <Card className="w-full max-w-md">
+      <GlassCard glow className="w-full max-w-md p-0">
         <CardContent className="p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-display font-bold">Crear cuenta</h1>
+            <GradientText as="h1" shimmer={false} className="text-2xl font-display font-bold">
+              Crear cuenta
+            </GradientText>
             <p className="mt-2 text-sm text-text-secondary">
               Regístrate para empezar a usar RideFlow
             </p>
@@ -200,7 +204,7 @@ export default function SignupPage() {
               </div>
             )}
 
-            <Button type="submit" loading={loading} className="w-full">
+            <Button type="submit" variant="glow-primary" loading={loading} className="w-full">
               Crear cuenta
             </Button>
           </form>
@@ -212,7 +216,7 @@ export default function SignupPage() {
             </Link>
           </p>
         </CardContent>
-      </Card>
+      </GlassCard>
     </div>
   );
 }

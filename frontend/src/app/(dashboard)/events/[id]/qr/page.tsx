@@ -49,7 +49,7 @@ export default function EventQrPage() {
   if (error || !event) {
     return (
       <PageContainer title="Código QR">
-        <Card>
+        <Card glass>
           <CardContent className="p-8 text-center">
             <p className="text-destructive">Error al cargar el evento</p>
             <div className="mt-4">
@@ -80,7 +80,7 @@ export default function EventQrPage() {
       }
     >
       <div className="flex flex-col items-center">
-        <Card className="w-full max-w-sm">
+        <Card glass className="w-full max-w-sm">
           <CardContent className="p-8 text-center">
             {event.qrCodeSvg ? (
               <div

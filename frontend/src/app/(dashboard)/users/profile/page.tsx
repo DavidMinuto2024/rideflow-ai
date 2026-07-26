@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { GradientText } from '@/components/ui/aceternity/GradientText';
 import { ApiError } from '@/lib/api';
 import { User, Phone, Building2 } from 'lucide-react';
 
@@ -78,7 +79,7 @@ export default function ProfilePage() {
       description="Información de tu cuenta y membresías"
     >
       {/* Profile card */}
-      <Card>
+      <Card glass>
         <CardContent className="p-6">
           <div className="flex items-start gap-5">
             <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
@@ -155,9 +156,9 @@ export default function ProfilePage() {
 
       {/* Memberships */}
       <section>
-        <h2 className="mb-3 text-lg font-display font-semibold">Membresías</h2>
+        <GradientText as="h2" shimmer={false} className="mb-3 text-lg font-display font-semibold">Membresías</GradientText>
         {memberships.length === 0 ? (
-          <Card>
+          <Card glass>
             <CardContent className="p-6 text-center">
               <Building2 className="mx-auto mb-2 size-8 text-text-muted" />
               <p className="text-sm text-text-secondary">
@@ -168,8 +169,8 @@ export default function ProfilePage() {
         ) : (
           <div className="flex flex-col gap-2">
             {memberships.map((m) => (
-              <Card key={m.organization.id}>
-                <CardContent className="flex items-center justify-between p-4">
+              <Card key={m.organization.id} glass>
+                  <CardContent className="flex items-center justify-between p-4">
                   <div>
                     <p className="font-medium">{m.organization.name}</p>
                     <p className="text-sm text-text-secondary">

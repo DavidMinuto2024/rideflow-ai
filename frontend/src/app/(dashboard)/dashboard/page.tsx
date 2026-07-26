@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
+import { GradientText } from '@/components/ui/aceternity/GradientText';
 import { ApiError } from '@/lib/api';
 
 const statCards = [
@@ -137,7 +138,7 @@ export default function DashboardPage() {
           const value = stats?.[card.key];
           const Icon = card.icon;
           return (
-            <Card key={card.key}>
+             <Card key={card.key} glass>
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <div
@@ -162,9 +163,9 @@ export default function DashboardPage() {
 
       {/* My organizations */}
       <div>
-        <h2 className="mb-3 text-lg font-display font-semibold">
+        <GradientText as="h2" shimmer={false} className="mb-3 text-lg font-display font-semibold">
           Mis organizaciones
-        </h2>
+        </GradientText>
         {memberships.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">

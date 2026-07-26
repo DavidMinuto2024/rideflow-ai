@@ -69,7 +69,7 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
             aria-modal="true"
             aria-label={title}
             className={cn(
-              'relative z-10 w-full max-w-lg rounded-xl border bg-surface p-6 shadow-xl',
+              'relative z-10 w-full max-w-lg rounded-xl border border-border/50 p-6 shadow-xl glass',
               className,
             )}
             variants={modalVariants}
@@ -85,7 +85,7 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
                 </h2>
                 <button
                   onClick={onClose}
-                  className="rounded-md p-1 text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+                  className="rounded-md p-1 text-text-muted transition-all duration-300 hover:text-text-primary hover:shadow-[0_0_8px_rgb(34_211_238/0.4)] glow-close"
                   aria-label="Close"
                 >
                   <X className="size-5" />

@@ -68,7 +68,7 @@ export default function NewEventPage() {
       title="Nuevo evento"
       description="Crea un evento de carpooling"
     >
-      <Card className="max-w-2xl">
+      <Card glass className="max-w-2xl">
         <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             {/* Organization selector */}

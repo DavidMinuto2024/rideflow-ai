@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { GradientText } from '@/components/ui/aceternity/GradientText';
 
 interface PageContainerProps {
   title: string;
@@ -17,9 +18,9 @@ export function PageContainer({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight">
+          <GradientText as="h1" shimmer={false} className="text-2xl font-display font-bold tracking-tight">
             {title}
-          </h1>
+          </GradientText>
           {description && (
             <p className="mt-1 text-rideflow-muted">{description}</p>
           )}

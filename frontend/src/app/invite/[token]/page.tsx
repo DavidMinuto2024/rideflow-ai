@@ -10,6 +10,7 @@ import { useVehicles } from '@/lib/queries/vehicles';
 import { useCreateVehicle } from '@/lib/queries/vehicles';
 import { PageContainer } from '@/components/PageContainer';
 import { Card, CardContent } from '@/components/ui/Card';
+import { GlassCard } from '@/components/ui/aceternity/GlassCard';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -168,13 +169,13 @@ export default function InvitePage() {
   if (step === 'error') {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
-        <Card className="w-full max-w-md">
+        <GlassCard glow className="w-full max-w-md p-0">
           <CardContent className="p-8 text-center">
             <XCircle className="mx-auto mb-4 size-12 text-destructive" />
             <h1 className="mb-2 text-xl font-display font-bold">Invitación inválida</h1>
             <p className="mb-6 text-sm text-text-secondary">{errorMessage}</p>
           </CardContent>
-        </Card>
+        </GlassCard>
       </div>
     );
   }
@@ -183,7 +184,7 @@ export default function InvitePage() {
   if (step === 'success') {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
-        <Card className="w-full max-w-md">
+        <GlassCard glow className="w-full max-w-md p-0">
           <CardContent className="p-8 text-center">
             <CheckCircle2 className="mx-auto mb-4 size-12 text-success" />
             <h1 className="mb-2 text-xl font-display font-bold">¡Te has unido!</h1>
@@ -194,7 +195,7 @@ export default function InvitePage() {
               Ir al evento
             </Button>
           </CardContent>
-        </Card>
+        </GlassCard>
       </div>
     );
   }
@@ -203,7 +204,7 @@ export default function InvitePage() {
   if (step === 'event-info') {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-lg">
+        <GlassCard glow className="w-full max-w-lg p-0">
           <CardContent className="p-8">
             <div className="mb-8 text-center">
               <h1 className="text-2xl font-display font-bold">{eventInfo?.title}</h1>
@@ -252,7 +253,7 @@ export default function InvitePage() {
               </button>
             </div>
           </CardContent>
-        </Card>
+        </GlassCard>
       </div>
     );
   }
@@ -261,7 +262,7 @@ export default function InvitePage() {
   if (step === 'driver-form') {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-lg">
+        <GlassCard glow className="w-full max-w-lg p-0">
           <CardContent className="p-8">
             <h1 className="mb-1 text-xl font-display font-bold">Unirse como conductor</h1>
             <p className="mb-6 text-sm text-text-secondary">
@@ -370,7 +371,7 @@ export default function InvitePage() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </GlassCard>
       </div>
     );
   }
@@ -379,7 +380,7 @@ export default function InvitePage() {
   if (step === 'passenger-form') {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-lg">
+        <GlassCard glow className="w-full max-w-lg p-0">
           <CardContent className="p-8">
             <h1 className="mb-1 text-xl font-display font-bold">Unirse como pasajero</h1>
             <p className="mb-6 text-sm text-text-secondary">
@@ -449,7 +450,7 @@ export default function InvitePage() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </GlassCard>
       </div>
     );
   }

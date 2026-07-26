@@ -54,9 +54,9 @@ export default function TripDetailPage() {
   if (!trip) {
     return (
       <PageContainer title="Viaje">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-destructive">Viaje no encontrado</p>
+          <Card glass>
+            <CardContent className="p-8 text-center">
+              <p className="text-destructive">Viaje no encontrado</p>
             <div className="mt-4">
               <Link href={`/events/${eventId}/trips`}>
                 <Button variant="link">
@@ -94,7 +94,7 @@ export default function TripDetailPage() {
         {/* Info panel */}
         <div className="flex flex-col gap-4 lg:col-span-1">
           {/* Driver info */}
-          <Card>
+          <Card glass>
             <CardContent className="p-5">
               <h3 className="mb-3 flex items-center gap-2 font-display font-semibold">
                 <User className="size-4 text-primary" />
@@ -140,7 +140,7 @@ export default function TripDetailPage() {
 
           {/* Vehicle info */}
           {trip.vehicle && (
-            <Card>
+            <Card glass>
               <CardContent className="p-5">
                 <h3 className="mb-3 flex items-center gap-2 font-display font-semibold">
                   <Car className="size-4 text-primary" />
@@ -166,7 +166,7 @@ export default function TripDetailPage() {
 
           {/* Route stats */}
           {route && (
-            <Card>
+            <Card glass>
               <CardContent className="p-5">
                 <h3 className="mb-3 flex items-center gap-2 font-display font-semibold">
                   <Route className="size-4 text-primary" />
@@ -220,7 +220,7 @@ export default function TripDetailPage() {
           )}
 
           {/* Passengers */}
-          <Card>
+          <Card glass>
             <CardContent className="p-5">
               <h3 className="mb-3 flex items-center gap-2 font-display font-semibold">
                 <Users className="size-4 text-primary" />
@@ -274,7 +274,7 @@ export default function TripDetailPage() {
         {/* Map */}
         <div className="lg:col-span-2">
           {hasRouteMap ? (
-            <Card className="overflow-hidden">
+            <Card glass className="overflow-hidden">
               <MapView
                 originLat={mapOriginLat}
                 originLng={mapOriginLng}
@@ -319,7 +319,7 @@ export default function TripDetailPage() {
               </div>
             </Card>
           ) : (
-            <Card>
+            <Card glass>
               <CardContent className="p-8 text-center">
                 <MapPin className="mx-auto mb-2 size-8 text-text-secondary" />
                 <p className="text-sm text-text-secondary">

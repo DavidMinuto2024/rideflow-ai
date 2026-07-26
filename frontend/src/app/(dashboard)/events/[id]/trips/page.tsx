@@ -42,7 +42,7 @@ export default function EventTripsPage() {
       }
     >
       {!trips || trips.length === 0 ? (
-        <Card>
+        <Card glass>
           <CardContent className="p-12 text-center">
             <Car className="mx-auto mb-4 size-12 text-text-muted" />
             <h3 className="text-lg font-display font-semibold text-text-primary">
@@ -61,8 +61,8 @@ export default function EventTripsPage() {
               href={`/events/${eventId}/trips/${trip.id}`}
               className="block"
             >
-              <Card className="transition hover:border-primary/50">
-                <CardContent className="p-5">
+              <Card glass className="transition hover:border-primary/50">
+                  <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <div className="flex size-9 items-center justify-center rounded-full bg-primary/10">
