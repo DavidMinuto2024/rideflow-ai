@@ -41,7 +41,11 @@ export class RoutesService {
     this.osrmBaseUrl = this.config.get<string>('OSRM_BASE_URL', '');
   }
 
-  async getOptimizedRoute(eventId: string, tripId: string) {
+  async getOptimizedRoute(
+    eventId: string,
+    tripId: string,
+    extraWaypoints: Array<{ lat: number; lng: number }> = [],
+  ) {
     const trip = await this.prisma.trip.findFirst({
       where: { id: tripId, eventId },
       include: {
@@ -58,22 +62,37 @@ export class RoutesService {
 
     const event = trip.event;
 
-    // Build waypoints: origin → passenger pickups → destination
+    // Build waypoints: driver start → passenger pickups → destination
     const waypoints: OSRMWaypoint[] = [];
 
-    // Start: event origin
-    if (event.originLat && event.originLng) {
+    // Start: trip's own origin (driver start) if available, else event origin
+    if (trip.originLat && trip.originLng) {
+      waypoints.push({
+        location: [trip.originLng, trip.originLat],
+        name: trip.origin || 'Salida del conductor',
+      });
+    } else if (event.originLat && event.originLng) {
       waypoints.push({
         location: [event.originLng, event.originLat],
         name: event.origin,
       });
     }
 
-    // Passenger origins (for now use event origin as pickup — passengers come to event)
-    // In a more advanced version, we'd collect passenger home/meeting locations
+    // Extra waypoints passed from the frontend (e.g. passenger pickup points)
+    for (const wp of extraWaypoints) {
+      waypoints.push({
+        location: [wp.lng, wp.lat],
+        name: 'Punto de encuentro',
+      });
+    }
 
-    // End: event destination
-    if (event.destLat && event.destLng) {
+    // End: trip's own destination if available, else event destination
+    if (trip.destLat && trip.destLng) {
+      waypoints.push({
+        location: [trip.destLng, trip.destLat],
+        name: trip.dest || 'Destino',
+      });
+    } else if (event.destLat && event.destLng) {
       waypoints.push({
         location: [event.destLng, event.destLat],
         name: event.destination,
@@ -138,23 +157,24 @@ export class RoutesService {
 
   private async fallbackRoute(
     event: { originLat?: number | null; originLng?: number | null; destLat?: number | null; destLng?: number | null; origin: string; destination: string },
-    trip: { id: string },
+    trip: { id: string; originLat?: number | null; originLng?: number | null; destLat?: number | null; destLng?: number | null },
   ) {
     // Calculate straight-line distance using haversine formula
     let distance = 0;
     let duration = 0;
 
-    if (
-      event.originLat &&
-      event.originLng &&
-      event.destLat &&
-      event.destLng
-    ) {
+    // Prefer trip coordinates, then event coordinates
+    const startLat = trip.originLat ?? event.originLat;
+    const startLng = trip.originLng ?? event.originLng;
+    const endLat = trip.destLat ?? event.destLat;
+    const endLng = trip.destLng ?? event.destLng;
+
+    if (startLat && startLng && endLat && endLng) {
       distance = this.haversineDistance(
-        event.originLat,
-        event.originLng,
-        event.destLat,
-        event.destLng,
+        startLat,
+        startLng,
+        endLat,
+        endLng,
       );
 
       // Assume average speed of 40 km/h for estimation

@@ -48,4 +48,8 @@ export class CreateEventDto {
   @IsInt()
   @Min(1)
   capacity?: number;
+
+  @IsOptional()
+  @IsDateString()
+  arrivalTime?: string;
 }

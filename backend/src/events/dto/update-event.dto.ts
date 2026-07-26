@@ -52,4 +52,8 @@ export class UpdateEventDto {
   @IsInt()
   @Min(1)
   capacity?: number;
+
+  @IsOptional()
+  @IsDateString()
+  arrivalTime?: string;
 }

@@ -10,6 +10,8 @@ import { EventStatus } from '@prisma/client';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { UpdateEventStatusDto } from './dto/update-event-status.dto';
+import * as crypto from 'crypto';
+import * as qrcode from 'qrcode';
 
 /**
  * Valid state transitions for the Event state machine.
@@ -42,7 +44,20 @@ export class EventsService {
       throw new UnprocessableEntityException('Date is required');
     }
 
-    return this.prisma.event.create({
+    // Generate invite token (expires in 7 days)
+    const inviteToken = crypto.randomUUID();
+    const inviteTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // Generate QR SVG data URL
+    const inviteUrl = `${this.getBaseUrl()}/invite/${inviteToken}`;
+    let qrCodeSvg: string | null = null;
+    try {
+      qrCodeSvg = await qrcode.toString(inviteUrl, { type: 'svg' });
+    } catch {
+      // QR generation is non-critical — event can still be created
+    }
+
+    const event = await this.prisma.event.create({
       data: {
         title: dto.title,
         description: dto.description,
@@ -55,8 +70,16 @@ export class EventsService {
         destLng: dto.destLng,
         capacity: dto.capacity ?? 4,
         organizationId,
+        inviteToken,
+        inviteTokenExpiresAt,
+        arrivalTime: dto.arrivalTime ? new Date(dto.arrivalTime) : null,
       },
     });
+
+    return {
+      ...event,
+      qrCodeSvg,
+    };
   }
 
   async findByOrganization(organizationId: string) {
@@ -163,6 +186,14 @@ export class EventsService {
    * Two events overlap if they share the same date and have overlapping time windows.
    * For now, checks events on the same date.
    */
+  /**
+   * Get the base URL for constructing invite links.
+   * Uses the APP_URL env var or defaults to localhost.
+   */
+  private getBaseUrl(): string {
+    return process.env.APP_URL || 'http://localhost:3000';
+  }
+
   private async checkOverlapping(event: {
     id: string;
     date: Date;

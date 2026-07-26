@@ -1,0 +1,52 @@
+# ═══════════════════════════════════════════════════════════
+# RideFlow AI — Render Blueprint
+#
+# Deploys the NestJS backend as a Web Service using Docker.
+# Database is hosted on Supabase (free tier).
+# ═══════════════════════════════════════════════════════════
+
+services:
+  - type: web
+    name: rideflow-backend
+    env: docker
+    repo: https://github.com/DavidMinuto2024/rideflow-ai
+    region: ohio
+    plan: free
+    branch: main
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: node dist/main
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "4000"
+      - key: DATABASE_URL
+        sync: false # Set this in Render dashboard — use Supabase hosted Postgres connection string
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: "3600"
+      - key: BACKEND_URL
+        value: "https://rideflow-backend.onrender.com"
+      - key: NEXT_PUBLIC_APP_URL
+        value: "https://rideflow-ai.vercel.app"
+      - key: OSRM_BASE_URL
+        value: "https://router.project-osrm.org"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NOTIFICATION_FROM
+        value: "noreply@rideflow.ai"

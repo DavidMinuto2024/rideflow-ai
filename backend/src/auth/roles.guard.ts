@@ -44,8 +44,7 @@ export class RolesGuard implements CanActivate {
     }
 
     // Try to get org context from route params
-    const orgId =
-      request.params?.organizationId || request.params?.id;
+    const orgId = request.params?.organizationId;
 
     if (orgId) {
       // Check role in the specific organization

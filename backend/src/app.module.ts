@@ -10,6 +10,9 @@ import { RidesModule } from './rides/rides.module';
 import { RoutesModule } from './routes/routes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { InvitationsModule } from './invitations/invitations.module';
+import { EventVehiclesModule } from './event-vehicles/event-vehicles.module';
+import { SuggestionsModule } from './suggestions/suggestions.module';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     RoutesModule,
     DashboardModule,
     NotificationsModule,
+    InvitationsModule,
+    EventVehiclesModule,
+    SuggestionsModule,
   ],
 })
 export class AppModule {}

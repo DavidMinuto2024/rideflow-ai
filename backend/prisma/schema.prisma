@@ -38,6 +38,17 @@ enum RequestStatus {
   CANCELLED
 }
 
+enum NotificationType {
+  RIDE_REQUESTED
+  RIDE_APPROVED
+  RIDE_REJECTED
+  RIDE_CANCELLED
+  TRIP_ASSIGNED
+  EVENT_REMINDER
+  ESTIMATED_PICKUP_TIME
+  EVENT_VEHICLE_REGISTERED
+}
+
 // ─── Organization ─────────────────────────────────────────
 // Root tenant entity — everything belongs to an org.
 
@@ -73,6 +84,7 @@ model User {
   drivenTrips    Trip[]               @relation("DriverTrips")
   assignments    PassengerAssignment[]
   notifications  Notification[]
+  eventVehicles  EventVehicle[]
 }
 
 // ─── OrganizationMember ───────────────────────────────────
@@ -112,6 +124,28 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   trips Trip[]
+  eventVehicles EventVehicle[]
+}
+
+// ─── EventVehicle ─────────────────────────────────────────
+// Per-event vehicle registration: a driver registers a vehicle
+// for a specific event with a start location and pico y placa check.
+
+model EventVehicle {
+  id           String   @id @default(cuid())
+  eventId      String
+  event        Event    @relation(fields: [eventId], references: [id])
+  vehicleId    String
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+  driverId     String
+  driver       User     @relation(fields: [driverId], references: [id])
+  startLocation String?
+  startLat     Float?
+  startLng     Float?
+  picoYPlaca   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([eventId, vehicleId])
 }
 
 // ─── Event ────────────────────────────────────────────────
@@ -138,8 +172,13 @@ model Event {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  inviteToken        String?   @unique
+  inviteTokenExpiresAt DateTime?
+  arrivalTime        DateTime?
+
   trips Trip[]
   rideRequests RideRequest[]
+  eventVehicles EventVehicle[]
 }
 
 // ─── Trip ─────────────────────────────────────────────────
@@ -148,7 +187,11 @@ model Event {
 model Trip {
   id        String   @id @default(cuid())
   origin    String?
+  originLat Float?
+  originLng Float?
   dest      String?
+  destLat   Float?
+  destLng   Float?
   notes     String?
   distance  Float?   // OSRM-optimized distance in meters
   duration  Float?   // OSRM-optimized duration in seconds
@@ -160,6 +203,8 @@ model Trip {
   driver    User     @relation("DriverTrips", fields: [driverId], references: [id])
   vehicleId String?
   vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  estimatedDepartureTime DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -183,6 +228,10 @@ model RideRequest {
   passengerId String
   passenger   User          @relation(fields: [passengerId], references: [id])
 
+  pickupLat     Float?
+  pickupLng     Float?
+  pickupAddress String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -200,6 +249,9 @@ model PassengerAssignment {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
 
+  estimatedPickupTime DateTime?
+  pickupOrder         Int?
+
   createdAt DateTime @default(now())
 
   @@unique([tripId, userId])
@@ -211,7 +263,7 @@ model PassengerAssignment {
 
 model Notification {
   id        String   @id @default(cuid())
-  type      String   // RIDE_REQUESTED, RIDE_APPROVED, RIDE_REJECTED, TRIP_ASSIGNED, EVENT_REMINDER
+  type      NotificationType
   title     String
   message   String?
   read      Boolean  @default(false)

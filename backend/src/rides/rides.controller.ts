@@ -18,6 +18,7 @@ import { User } from '@prisma/client';
 import { RidesService } from './rides.service';
 import { CreateRideRequestDto } from './dto/create-ride-request.dto';
 import { UpdateRideRequestDto } from './dto/update-ride-request.dto';
+import { DirectAssignDto } from './dto/direct-assign.dto';
 
 @Controller()
 export class RidesController {
@@ -61,6 +62,17 @@ export class RidesController {
     @CurrentUser() user: User,
   ) {
     return this.ridesService.autoAssign(eventId, user.id);
+  }
+
+  @Post('events/:eventId/direct-assign')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.ORG_ADMIN, Role.DRIVER)
+  async directAssign(
+    @Param('eventId') eventId: string,
+    @Body() dto: DirectAssignDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.ridesService.directAssign(eventId, dto, user.id);
   }
 
   // ─── Trips ─────────────────────────────────────────────

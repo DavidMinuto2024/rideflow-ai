@@ -26,7 +26,7 @@ export class EventsController {
 
   @Post('organizations/:organizationId/events')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.ORG_ADMIN, Role.DRIVER)
+  @Roles(Role.ORG_ADMIN, Role.DRIVER, Role.PASSENGER)
   async create(
     @Param('organizationId') organizationId: string,
     @Body() dto: CreateEventDto,

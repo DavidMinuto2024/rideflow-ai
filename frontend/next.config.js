@@ -8,11 +8,12 @@ const nextConfig = {
       },
     ],
   },
+  // Proxy API calls to the NestJS backend (Render in prod, localhost in dev)
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'}/api/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'http://localhost:4000'}/api/:path*`,
       },
     ];
   },

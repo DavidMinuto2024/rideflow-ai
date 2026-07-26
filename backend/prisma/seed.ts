@@ -195,7 +195,31 @@ async function main() {
   });
   console.log(`  ✓ Event: ${event.title} (${event.status})`);
 
-  // ── 4. Note about pending users ─────────────────────────
+  // ── 4. Platform owner (user behind the app) ──────────────
+  const ownerEmail = 'dsp5502@gmail.com';
+  const existingOwner = await prisma.user.findUnique({ where: { email: ownerEmail } });
+  if (!existingOwner) {
+    const owner = await prisma.user.create({
+      data: {
+        email: ownerEmail,
+        name: 'David Santiago',
+        phone: null,
+        avatar: null,
+      },
+    });
+    await prisma.organizationMember.create({
+      data: {
+        userId: owner.id,
+        organizationId: org.id,
+        role: Role.ORG_ADMIN,
+      },
+    });
+    console.log(`  ✓ Platform owner: ${owner.name} (${owner.email}) — ADMIN role`);
+  } else {
+    console.log(`  ✓ Platform owner already exists: ${existingOwner.email}`);
+  }
+
+  // ── 5. Note about pending users ─────────────────────────
   console.log('\n  ⚠️  Javi López: mencionado en el chat pero sin coordenadas — agregar manualmente cuando comparta ubicación.');
 
   console.log('\n✅ Seed complete!');

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "name": "rideflow-frontend",
+  "framework": "nextjs",
+  "github": {
+    "silent": true,
+    "autoJobCancelation": true
+  }
+}

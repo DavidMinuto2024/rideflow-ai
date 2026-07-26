@@ -53,8 +53,10 @@ export default function InvitePage() {
 
   // Resolve orgId from event info
   useEffect(() => {
-    if (eventInfo?.organizationId) {
-      setOrgId(eventInfo.organizationId);
+    const resolvedOrgId =
+      eventInfo?.organizationId ?? eventInfo?.organization?.id;
+    if (resolvedOrgId) {
+      setOrgId(resolvedOrgId);
     }
   }, [eventInfo]);
 

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
@@ -16,7 +17,15 @@ export class RoutesController {
   async getOptimizedRoute(
     @Param('eventId') eventId: string,
     @Param('tripId') tripId: string,
+    @Query('waypoints') waypoints?: string,
   ) {
-    return this.routesService.getOptimizedRoute(eventId, tripId);
+    const parsedWaypoints = waypoints
+      ? waypoints.split(';').map((wp) => {
+          const [lat, lng] = wp.split(',').map(Number);
+          return { lat, lng };
+        })
+      : [];
+
+    return this.routesService.getOptimizedRoute(eventId, tripId, parsedWaypoints);
   }
 }

@@ -38,18 +38,24 @@ export function useVehicle(id: string) {
 export function useCreateVehicle(organizationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       plate?: string;
       model?: string;
       capacity: number;
       driverId?: string;
-    }) =>
-      apiClient.post<Vehicle>(
+    }) => {
+      if (!organizationId) {
+        throw new Error('Selecciona una organización primero');
+      }
+      return apiClient.post<Vehicle>(
         `/organizations/${organizationId}/vehicles`,
         data,
-      ),
+      );
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles', organizationId] });
+      if (organizationId) {
+        queryClient.invalidateQueries({ queryKey: ['vehicles', organizationId] });
+      }
     },
   });
 }
