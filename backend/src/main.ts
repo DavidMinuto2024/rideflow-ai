@@ -3,26 +3,33 @@ import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    credentials: true,
-  });
+  try {
+    const app = await NestFactory.create(AppModule);
 
-  app.setGlobalPrefix('api');
+    app.enableCors({
+      origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+      credentials: true,
+    });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+    app.setGlobalPrefix('api');
 
-  const port = process.env.PORT || 4000;
-  await app.listen(port);
-  logger.log(`RideFlow API running on http://localhost:${port}/api`);
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
+    const port = process.env.PORT || 4000;
+    await app.listen(port);
+    logger.log(`RideFlow API running on http://localhost:${port}/api`);
+  } catch (error) {
+    logger.error(`Failed to start application: ${(error as Error).message}`);
+    logger.error((error as Error).stack ?? '');
+    process.exit(1);
+  }
 }
 bootstrap();
