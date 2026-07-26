@@ -5,31 +5,32 @@
 # ═══════════════════════════════════════════════════════════
 
 # ── Base ─────────────────────────────────────────────────
-FROM node:20-alpine AS base
+FROM node:22-slim AS base
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # ── Dependencies ─────────────────────────────────────────
 FROM base AS deps
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # ── Development ──────────────────────────────────────────
 FROM base AS development
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 EXPOSE 4000
-CMD ["pnpm", "run", "start:dev"]
+CMD ["sh", "-c", "npx prisma generate && npm run start:dev"]
 
 # ── Production Build ─────────────────────────────────────
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate && pnpm run build
+RUN npx prisma generate && npm run build
 
 # ── Production ───────────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:22-slim AS production
 WORKDIR /app
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
