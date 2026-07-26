@@ -7,10 +7,10 @@
 @layer base {
   :root {
     /* Background & surfaces */
-    --color-bg: 11 17 33;
-    --color-surface: 19 27 46;
-    --color-surface-hover: 26 36 64;
-    --color-border: 42 58 92;
+    --color-bg: 0 0 0;
+    --color-surface: 10 10 15;
+    --color-surface-hover: 18 18 26;
+    --color-border: 38 38 50;
 
     /* Brand */
     --color-primary: 34 211 238;
