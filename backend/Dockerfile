@@ -19,5 +19,5 @@ COPY . .
 RUN npx prisma generate && npm run build
 
 EXPOSE 4000
-# DEBUG: Test if Node.js runs at all
-CMD ["node", "-e", "console.log('RideFlow container OK v' + process.version); setInterval(() => {}, 60000)"]
+# Diagnostic: check dist exists, then run the app
+CMD ls -la /app/dist/ 2>&1; echo '---'; ls -la /app/dist/main* 2>&1; echo '---'; node /app/dist/main
