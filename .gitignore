@@ -16,6 +16,10 @@ build/
 # IDE
 .vscode/
 .idea/
+.windsurf/
+.cursor/
+.codegraph/
+null
 *.swp
 *.swo
 
