@@ -3,7 +3,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 interface OSRMWaypoint {
   location: [number, number]; // [lng, lat]
@@ -47,7 +47,7 @@ export class SuggestionsService {
   private readonly osrmBaseUrl: string;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
     private readonly config: ConfigService,
   ) {
     this.osrmBaseUrl = this.config.get<string>('OSRM_BASE_URL', '');
@@ -96,42 +96,43 @@ export class SuggestionsService {
    * then return suggestions ranked per driver.
    */
   async getSuggestions(eventId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
     // Get all registered vehicles for this event with start locations
-    const eventVehicles = await this.prisma.eventVehicle.findMany({
-      where: {
-        eventId,
-        startLat: { not: null },
-        startLng: { not: null },
-      },
-      include: {
-        driver: { select: { id: true, name: true } },
-        vehicle: true,
-      },
-    });
+    const { data: eventVehicles, error: evError } = await this.supabase
+      .from('event_vehicles')
+      .select('*, driver:users(id, name), vehicle:vehicles(*)')
+      .eq('event_id', eventId)
+      .not('start_lat', 'is', null)
+      .not('start_lng', 'is', null);
 
-    if (eventVehicles.length === 0) {
+    if (evError) this.supabase.handleError(evError, 'event_vehicles');
+
+    if (!eventVehicles || eventVehicles.length === 0) {
       return { suggestions: [], message: 'No drivers with start locations registered' };
     }
 
     // Get all pending ride requests with pickup coordinates
-    const pendingRequests = await this.prisma.rideRequest.findMany({
-      where: {
-        eventId,
-        status: 'PENDING' as any,
-        pickupLat: { not: null },
-        pickupLng: { not: null },
-      },
-      include: {
-        passenger: { select: { id: true, name: true } },
-      },
-    });
+    const { data: pendingRequests, error: prError } = await this.supabase
+      .from('ride_requests')
+      .select('*, passenger:users(id, name)')
+      .eq('event_id', eventId)
+      .eq('status', 'PENDING')
+      .not('pickup_lat', 'is', null)
+      .not('pickup_lng', 'is', null);
 
-    if (pendingRequests.length === 0) {
+    if (prError) this.supabase.handleError(prError, 'ride_requests');
+
+    if (!pendingRequests || pendingRequests.length === 0) {
       return { suggestions: [], message: 'No pending passengers with pickup locations' };
     }
 
@@ -147,20 +148,20 @@ export class SuggestionsService {
 
       for (const ev of eventVehicles) {
         const distance = this.haversineDistance(
-          ev.startLat!,
-          ev.startLng!,
-          request.pickupLat!,
-          request.pickupLng!,
+          ev.start_lat!,
+          ev.start_lng!,
+          request.pickup_lat!,
+          request.pickup_lng!,
         );
 
         driverScores.push({
-          driverId: ev.driverId,
+          driverId: ev.driver_id,
           driverName: ev.driver?.name || 'Unknown',
-          vehicleId: ev.vehicleId,
+          vehicleId: ev.vehicle_id,
           vehicleModel: ev.vehicle?.model || 'Unknown',
           capacity: ev.vehicle?.capacity || 4,
-          startLat: ev.startLat!,
-          startLng: ev.startLng!,
+          startLat: ev.start_lat!,
+          startLng: ev.start_lng!,
           distanceFromPassenger: Math.round(distance),
           score: this.computeScore(distance),
         });
@@ -170,7 +171,7 @@ export class SuggestionsService {
       driverScores.sort((a, b) => b.score - a.score);
 
       suggestions.push({
-        passengerId: request.passengerId,
+        passengerId: request.passenger_id,
         passengerName: request.passenger?.name || 'Unknown',
         drivers: driverScores,
       });
@@ -190,29 +191,38 @@ export class SuggestionsService {
    * 5. Store estimatedDepartureTime on Trip and estimatedPickupTime + pickupOrder on each PassengerAssignment
    */
   async optimizeTimes(eventId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
-    if (!event.arrivalTime) {
+    if (!event.arrival_time) {
       return {
         message: 'No arrivalTime set on event — cannot compute departure/pickup times',
         trips: [],
       };
     }
 
-    const trips = await this.prisma.trip.findMany({
-      where: { eventId },
-      include: {
-        passengerAssignments: {
-          include: { user: true },
-          orderBy: { createdAt: 'asc' as const },
-        },
-      },
-    });
+    const { data: trips, error: tripsError } = await this.supabase
+      .from('trips')
+      .select(
+        '*, passenger_assignments:passenger_assignments(*, user:users(*))',
+      )
+      .eq('event_id', eventId)
+      .order('created_at', {
+        ascending: true,
+        foreignTable: 'passenger_assignments',
+      });
 
-    const arrivalTime = new Date(event.arrivalTime).getTime();
+    if (tripsError) this.supabase.handleError(tripsError, 'trips');
+
+    const arrivalTime = new Date(event.arrival_time).getTime();
     const results: Array<{
       tripId: string;
       estimatedDepartureTime: string | null;
@@ -220,24 +230,29 @@ export class SuggestionsService {
       source: string;
     }> = [];
 
-    for (const trip of trips) {
+    for (const trip of trips || []) {
       // Get driver's EventVehicle start location
-      const eventVehicle = await this.prisma.eventVehicle.findFirst({
-        where: { eventId, driverId: trip.driverId },
-      });
+      const { data: eventVehicle, error: evError } = await this.supabase
+        .from('event_vehicles')
+        .select('start_location, start_lat, start_lng')
+        .eq('event_id', eventId)
+        .eq('driver_id', trip.driver_id)
+        .maybeSingle();
+
+      if (evError) this.supabase.handleError(evError, 'event_vehicles');
 
       // Build waypoints: driver start → passenger pickups → destination
       const waypoints: OSRMWaypoint[] = [];
 
       // Driver start (from EventVehicle or from trip origin)
-      if (eventVehicle?.startLat && eventVehicle?.startLng) {
+      if (eventVehicle?.start_lat && eventVehicle?.start_lng) {
         waypoints.push({
-          location: [eventVehicle.startLng, eventVehicle.startLat],
-          name: eventVehicle.startLocation || 'Driver start',
+          location: [eventVehicle.start_lng, eventVehicle.start_lat],
+          name: eventVehicle.start_location || 'Driver start',
         });
-      } else if (trip.originLat && trip.originLng) {
+      } else if (trip.origin_lat && trip.origin_lng) {
         waypoints.push({
-          location: [trip.originLng, trip.originLat],
+          location: [trip.origin_lng, trip.origin_lat],
           name: trip.origin || 'Driver start',
         });
       }
@@ -245,32 +260,35 @@ export class SuggestionsService {
       // Passenger pickups (from RideRequest or PassengerAssignment)
       const pickups: Array<{ userId: string; lat: number; lng: number }> = [];
 
-      for (const assignment of trip.passengerAssignments) {
-        const rideRequest = await this.prisma.rideRequest.findFirst({
-          where: {
-            eventId,
-            passengerId: assignment.userId,
-            pickupLat: { not: null },
-            pickupLng: { not: null },
-          },
-        });
+      for (const assignment of trip.passenger_assignments || []) {
+        const { data: rideRequest, error: rrError } = await this.supabase
+          .from('ride_requests')
+          .select('pickup_lat, pickup_lng, pickup_address')
+          .eq('event_id', eventId)
+          .eq('passenger_id', assignment.user_id)
+          .not('pickup_lat', 'is', null)
+          .not('pickup_lng', 'is', null)
+          .limit(1)
+          .maybeSingle();
 
-        if (rideRequest?.pickupLat && rideRequest?.pickupLng) {
+        if (rrError) this.supabase.handleError(rrError, 'ride_requests');
+
+        if (rideRequest?.pickup_lat && rideRequest?.pickup_lng) {
           waypoints.push({
-            location: [rideRequest.pickupLng, rideRequest.pickupLat],
-            name: rideRequest.pickupAddress || `Pickup ${assignment.userId}`,
+            location: [rideRequest.pickup_lng, rideRequest.pickup_lat],
+            name: rideRequest.pickup_address || `Pickup ${assignment.user_id}`,
           });
           pickups.push({
-            userId: assignment.userId,
-            lat: rideRequest.pickupLat,
-            lng: rideRequest.pickupLng,
+            userId: assignment.user_id,
+            lat: rideRequest.pickup_lat,
+            lng: rideRequest.pickup_lng,
           });
         }
       }
 
       // Destination
-      const destLat = trip.destLat ?? event.destLat;
-      const destLng = trip.destLng ?? event.destLng;
+      const destLat = trip.dest_lat ?? event.dest_lat;
+      const destLng = trip.dest_lng ?? event.dest_lng;
       if (destLat && destLng) {
         waypoints.push({
           location: [destLng, destLat],
@@ -316,10 +334,14 @@ export class SuggestionsService {
       const departureDate = new Date(departureTimeMs);
 
       // Update trip with estimated departure time
-      await this.prisma.trip.update({
-        where: { id: trip.id },
-        data: { estimatedDepartureTime: departureDate },
-      });
+      const { error: tripUpdateError } = await this.supabase
+        .from('trips')
+        .update({
+          estimated_departure_time: departureDate.toISOString(),
+        })
+        .eq('id', trip.id);
+
+      if (tripUpdateError) this.supabase.handleError(tripUpdateError, 'trips');
 
       // Compute per-passenger pickup times
       const pickupTimes: Array<{ passengerId: string; pickupTime: string; order: number }> = [];
@@ -334,17 +356,19 @@ export class SuggestionsService {
         const pickupTime = new Date(cumulativeMs);
 
         // Update PassengerAssignment with pickup time and order
-        const assignment = trip.passengerAssignments.find(
-          (pa: { userId: string }) => pa.userId === pickups[i].userId,
+        const assignment = (trip.passenger_assignments || []).find(
+          (pa: { user_id: string }) => pa.user_id === pickups[i].userId,
         );
         if (assignment) {
-          await this.prisma.passengerAssignment.update({
-            where: { id: assignment.id },
-            data: {
-              estimatedPickupTime: pickupTime,
-              pickupOrder: i + 1,
-            },
-          });
+          const { error: paError } = await this.supabase
+            .from('passenger_assignments')
+            .update({
+              estimated_pickup_time: pickupTime.toISOString(),
+              pickup_order: i + 1,
+            })
+            .eq('id', assignment.id);
+
+          if (paError) this.supabase.handleError(paError, 'passenger_assignments');
 
           pickupTimes.push({
             passengerId: pickups[i].userId,
@@ -364,7 +388,7 @@ export class SuggestionsService {
 
     return {
       message: `Optimized times for ${results.length} trip(s)`,
-      arrivalTime: event.arrivalTime.toISOString(),
+      arrivalTime: new Date(event.arrival_time).toISOString(),
       trips: results,
     };
   }

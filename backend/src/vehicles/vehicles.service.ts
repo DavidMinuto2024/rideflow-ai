@@ -4,13 +4,13 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 
 @Injectable()
 export class VehiclesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly supabase: SupabaseDataService) {}
 
   async create(organizationId: string, dto: CreateVehicleDto, driverId: string) {
     // Check capacity doesn't exceed limit
@@ -18,36 +18,53 @@ export class VehiclesService {
       throw new BadRequestException('Capacity cannot exceed 20');
     }
 
-    return this.prisma.vehicle.create({
-      data: {
+    const { data, error } = await this.supabase
+      .from('vehicles')
+      .insert({
         plate: dto.plate,
         model: dto.model,
         capacity: dto.capacity ?? 4,
-        organizationId,
-        driverId,
-      },
-    });
+        organization_id: organizationId,
+        driver_id: driverId,
+      })
+      .select()
+      .single();
+
+    if (error) this.supabase.handleError(error, 'vehicles');
+    return data;
   }
 
   async findByOrganization(organizationId: string, includeInactive = false) {
-    const where: Record<string, unknown> = { organizationId };
+    let query = this.supabase
+      .from('vehicles')
+      .select('*, driver:users(id, name, email)')
+      .eq('organization_id', organizationId);
 
     if (!includeInactive) {
-      where['isActive'] = true;
+      query = query.eq('is_active', true);
     }
 
-    return this.prisma.vehicle.findMany({
-      where,
-      include: { driver: { select: { id: true, name: true, email: true } } },
-      orderBy: { createdAt: 'desc' },
+    const { data, error } = await query.order('created_at', {
+      ascending: false,
     });
+
+    if (error) this.supabase.handleError(error, 'vehicles');
+    return data || [];
   }
 
   async findOne(id: string) {
-    const vehicle = await this.prisma.vehicle.findUnique({
-      where: { id },
-      include: { driver: true },
-    });
+    const { data: vehicle, error } = await this.supabase
+      .from('vehicles')
+      .select('*, driver:users(*)')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new NotFoundException(`Vehicle ${id} not found`);
+      }
+      this.supabase.handleError(error, 'vehicles');
+    }
 
     if (!vehicle) {
       throw new NotFoundException(`Vehicle ${id} not found`);
@@ -57,8 +74,15 @@ export class VehiclesService {
   }
 
   async update(id: string, dto: UpdateVehicleDto) {
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
-    if (!vehicle) {
+    // Verify exists
+    const { data: existing, error: findError } = await this.supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'vehicles');
+    if (!existing) {
       throw new NotFoundException(`Vehicle ${id} not found`);
     }
 
@@ -67,55 +91,80 @@ export class VehiclesService {
       throw new BadRequestException('Capacity cannot exceed 20');
     }
 
-    // If driverId is explicitly set to null, unassign the driver
-    const data: Record<string, unknown> = { ...dto };
-    if (dto.driverId === null) {
-      data['driverId'] = null;
-    }
+    // Build update data with snake_case column mapping
+    const data: Record<string, unknown> = {};
+    if (dto.plate !== undefined) data['plate'] = dto.plate;
+    if (dto.model !== undefined) data['model'] = dto.model;
+    if (dto.capacity !== undefined) data['capacity'] = dto.capacity;
+    if (dto.isActive !== undefined) data['is_active'] = dto.isActive;
+    if ('driverId' in dto) data['driver_id'] = dto.driverId;
 
-    return this.prisma.vehicle.update({
-      where: { id },
-      data: data as any,
-    });
+    const { data: updated, error: updateError } = await this.supabase
+      .from('vehicles')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'vehicles');
+    return updated;
   }
 
   async remove(id: string) {
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
-    if (!vehicle) {
+    // Verify exists
+    const { data: existing, error: findError } = await this.supabase
+      .from('vehicles')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'vehicles');
+    if (!existing) {
       throw new NotFoundException(`Vehicle ${id} not found`);
     }
 
     // Check if vehicle has active trips
-    const activeTrips = await this.prisma.trip.findFirst({
-      where: {
-        vehicleId: id,
-        event: {
-          status: {
-            in: ['DRAFT', 'PUBLISHED', 'OPEN'],
-          },
-        },
-      },
-    });
+    const { data: activeTrips, error: tripsError } = await this.supabase
+      .from('trips')
+      .select('id')
+      .eq('vehicle_id', id)
+      .in('event.status', ['DRAFT', 'PUBLISHED', 'OPEN'])
+      .limit(1);
 
-    if (activeTrips) {
-      throw new ConflictException(
-        'Cannot delete vehicle with active trips',
-      );
+    if (tripsError) this.supabase.handleError(tripsError, 'trips');
+    if (activeTrips && activeTrips.length > 0) {
+      throw new ConflictException('Cannot delete vehicle with active trips');
     }
 
-    await this.prisma.vehicle.delete({ where: { id } });
+    const { error: deleteError } = await this.supabase
+      .from('vehicles')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) this.supabase.handleError(deleteError, 'vehicles');
     return { deleted: true };
   }
 
   async toggleActive(id: string) {
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    const { data: vehicle, error: findError } = await this.supabase
+      .from('vehicles')
+      .select('is_active')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'vehicles');
     if (!vehicle) {
       throw new NotFoundException(`Vehicle ${id} not found`);
     }
 
-    return this.prisma.vehicle.update({
-      where: { id },
-      data: { isActive: !vehicle.isActive },
-    });
+    const { data: updated, error: updateError } = await this.supabase
+      .from('vehicles')
+      .update({ is_active: !vehicle.is_active })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'vehicles');
+    return updated;
   }
 }
