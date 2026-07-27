@@ -1,10 +1,23 @@
 -- ═══════════════════════════════════════════════════════════
--- RideFlow AI — Initial database schema
+-- RideFlow AI — Initial database schema (snake_case for PostgREST)
 --
--- Extracted from backend/prisma/schema.prisma for Supabase
--- Management API migration. All DDL uses IF [NOT] EXISTS for
--- idempotency so this script can be safely re-run.
+-- All table and column names use snake_case to match supabase-js
+-- queries. All DDL uses IF [NOT] EXISTS for idempotency.
 -- ═══════════════════════════════════════════════════════════
+
+-- ─── Drop PascalCase tables (from Prisma-style migration) ──
+-- Reverse dependency order to respect FK constraints
+
+DROP TABLE IF EXISTS "PassengerAssignment" CASCADE;
+DROP TABLE IF EXISTS "RideRequest" CASCADE;
+DROP TABLE IF EXISTS "Trip" CASCADE;
+DROP TABLE IF EXISTS "EventVehicle" CASCADE;
+DROP TABLE IF EXISTS "Notification" CASCADE;
+DROP TABLE IF EXISTS "Event" CASCADE;
+DROP TABLE IF EXISTS "Vehicle" CASCADE;
+DROP TABLE IF EXISTS "OrganizationMember" CASCADE;
+DROP TABLE IF EXISTS "User" CASCADE;
+DROP TABLE IF EXISTS "Organization" CASCADE;
 
 -- ─── Enums ────────────────────────────────────────────────
 
@@ -32,187 +45,187 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
--- ─── Organization ─────────────────────────────────────────
+-- ─── organizations ────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "Organization" (
+CREATE TABLE IF NOT EXISTS organizations (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     slug        TEXT NOT NULL UNIQUE,
     logo        TEXT,
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ─── User ─────────────────────────────────────────────────
+-- ─── users ────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "User" (
+CREATE TABLE IF NOT EXISTS users (
     id          TEXT PRIMARY KEY,
     email       TEXT NOT NULL UNIQUE,
     name        TEXT NOT NULL,
     phone       TEXT,
     avatar      TEXT,
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ─── OrganizationMember ───────────────────────────────────
+-- ─── organization_members ─────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "OrganizationMember" (
+CREATE TABLE IF NOT EXISTS organization_members (
     id               TEXT         PRIMARY KEY,
     role             "Role"       NOT NULL DEFAULT 'PASSENGER',
-    "organizationId" TEXT         NOT NULL REFERENCES "Organization"(id),
-    "userId"         TEXT         NOT NULL REFERENCES "User"(id),
-    "createdAt"      TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    "updatedAt"      TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    UNIQUE("organizationId", "userId")
+    organization_id  TEXT         NOT NULL REFERENCES organizations(id),
+    user_id          TEXT         NOT NULL REFERENCES users(id),
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE(organization_id, user_id)
 );
 
--- ─── Vehicle ──────────────────────────────────────────────
+-- ─── vehicles ─────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "Vehicle" (
+CREATE TABLE IF NOT EXISTS vehicles (
     id               TEXT         PRIMARY KEY,
     plate            TEXT,
     model            TEXT,
     capacity         INTEGER      NOT NULL DEFAULT 4,
-    "isActive"       BOOLEAN      NOT NULL DEFAULT true,
-    "organizationId" TEXT         NOT NULL REFERENCES "Organization"(id),
-    "driverId"       TEXT         REFERENCES "User"(id),
-    "createdAt"      TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    "updatedAt"      TIMESTAMPTZ  NOT NULL DEFAULT now()
+    is_active        BOOLEAN      NOT NULL DEFAULT true,
+    organization_id  TEXT         NOT NULL REFERENCES organizations(id),
+    driver_id        TEXT         REFERENCES users(id),
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
--- ─── Event ────────────────────────────────────────────────
+-- ─── events ───────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "Event" (
-    id                   TEXT         PRIMARY KEY,
-    title                TEXT         NOT NULL,
-    description          TEXT,
-    date                 TIMESTAMPTZ  NOT NULL,
-    origin               TEXT         NOT NULL,
-    "originLat"          DOUBLE PRECISION,
-    "originLng"          DOUBLE PRECISION,
-    destination          TEXT         NOT NULL,
-    "destLat"            DOUBLE PRECISION,
-    "destLng"            DOUBLE PRECISION,
-    capacity             INTEGER      NOT NULL DEFAULT 4,
-    status               "EventStatus" NOT NULL DEFAULT 'DRAFT',
-    "organizationId"     TEXT         NOT NULL REFERENCES "Organization"(id),
-    "createdAt"          TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    "updatedAt"          TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    "inviteToken"        TEXT         UNIQUE,
-    "inviteTokenExpiresAt" TIMESTAMPTZ,
-    "arrivalTime"        TIMESTAMPTZ
+CREATE TABLE IF NOT EXISTS events (
+    id                      TEXT            PRIMARY KEY,
+    title                   TEXT            NOT NULL,
+    description             TEXT,
+    date                    TIMESTAMPTZ     NOT NULL,
+    origin                  TEXT            NOT NULL,
+    origin_lat              DOUBLE PRECISION,
+    origin_lng              DOUBLE PRECISION,
+    destination             TEXT            NOT NULL,
+    dest_lat                DOUBLE PRECISION,
+    dest_lng                DOUBLE PRECISION,
+    capacity                INTEGER         NOT NULL DEFAULT 4,
+    status                  "EventStatus"   NOT NULL DEFAULT 'DRAFT',
+    organization_id         TEXT            NOT NULL REFERENCES organizations(id),
+    created_at              TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    invite_token            TEXT            UNIQUE,
+    invite_token_expires_at TIMESTAMPTZ,
+    arrival_time            TIMESTAMPTZ
 );
 
--- ─── EventVehicle ─────────────────────────────────────────
+-- ─── event_vehicles ───────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "EventVehicle" (
+CREATE TABLE IF NOT EXISTS event_vehicles (
     id              TEXT         PRIMARY KEY,
-    "eventId"       TEXT         NOT NULL REFERENCES "Event"(id),
-    "vehicleId"     TEXT         NOT NULL REFERENCES "Vehicle"(id),
-    "driverId"      TEXT         NOT NULL REFERENCES "User"(id),
-    "startLocation" TEXT,
-    "startLat"      DOUBLE PRECISION,
-    "startLng"      DOUBLE PRECISION,
-    "picoYPlaca"    BOOLEAN      NOT NULL DEFAULT false,
-    "createdAt"     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    UNIQUE("eventId", "vehicleId")
+    event_id        TEXT         NOT NULL REFERENCES events(id),
+    vehicle_id      TEXT         NOT NULL REFERENCES vehicles(id),
+    driver_id       TEXT         NOT NULL REFERENCES users(id),
+    start_location  TEXT,
+    start_lat       DOUBLE PRECISION,
+    start_lng       DOUBLE PRECISION,
+    pico_y_placa    BOOLEAN      NOT NULL DEFAULT false,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE(event_id, vehicle_id)
 );
 
--- ─── Trip ─────────────────────────────────────────────────
+-- ─── trips ────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "Trip" (
-    id                      TEXT         PRIMARY KEY,
-    origin                  TEXT,
-    "originLat"             DOUBLE PRECISION,
-    "originLng"             DOUBLE PRECISION,
-    dest                    TEXT,
-    "destLat"               DOUBLE PRECISION,
-    "destLng"               DOUBLE PRECISION,
-    notes                   TEXT,
-    distance                DOUBLE PRECISION,
-    duration                DOUBLE PRECISION,
-    "routeGeometry"         TEXT,
-    "eventId"               TEXT         NOT NULL REFERENCES "Event"(id),
-    "driverId"              TEXT         NOT NULL REFERENCES "User"(id),
-    "vehicleId"             TEXT         REFERENCES "Vehicle"(id),
-    "estimatedDepartureTime" TIMESTAMPTZ,
-    "createdAt"             TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    "updatedAt"             TIMESTAMPTZ  NOT NULL DEFAULT now()
+CREATE TABLE IF NOT EXISTS trips (
+    id                       TEXT            PRIMARY KEY,
+    origin                   TEXT,
+    origin_lat               DOUBLE PRECISION,
+    origin_lng               DOUBLE PRECISION,
+    dest                     TEXT,
+    dest_lat                 DOUBLE PRECISION,
+    dest_lng                 DOUBLE PRECISION,
+    notes                    TEXT,
+    distance                 DOUBLE PRECISION,
+    duration                 DOUBLE PRECISION,
+    route_geometry           TEXT,
+    event_id                 TEXT            NOT NULL REFERENCES events(id),
+    driver_id                TEXT            NOT NULL REFERENCES users(id),
+    vehicle_id               TEXT            REFERENCES vehicles(id),
+    estimated_departure_time TIMESTAMPTZ,
+    created_at               TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    updated_at               TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
 
--- ─── RideRequest ──────────────────────────────────────────
+-- ─── ride_requests ────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "RideRequest" (
+CREATE TABLE IF NOT EXISTS ride_requests (
     id              TEXT            PRIMARY KEY,
     status          "RequestStatus" NOT NULL DEFAULT 'PENDING',
-    "tripId"        TEXT            REFERENCES "Trip"(id),
-    "eventId"       TEXT            NOT NULL REFERENCES "Event"(id),
-    "passengerId"   TEXT            NOT NULL REFERENCES "User"(id),
-    "pickupLat"     DOUBLE PRECISION,
-    "pickupLng"     DOUBLE PRECISION,
-    "pickupAddress" TEXT,
-    "createdAt"     TIMESTAMPTZ     NOT NULL DEFAULT now(),
-    "updatedAt"     TIMESTAMPTZ     NOT NULL DEFAULT now(),
-    UNIQUE("eventId", "passengerId")
+    trip_id         TEXT            REFERENCES trips(id),
+    event_id        TEXT            NOT NULL REFERENCES events(id),
+    passenger_id    TEXT            NOT NULL REFERENCES users(id),
+    pickup_lat      DOUBLE PRECISION,
+    pickup_lng      DOUBLE PRECISION,
+    pickup_address  TEXT,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    UNIQUE(event_id, passenger_id)
 );
 
--- ─── PassengerAssignment ──────────────────────────────────
+-- ─── passenger_assignments ────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "PassengerAssignment" (
+CREATE TABLE IF NOT EXISTS passenger_assignments (
     id                   TEXT        PRIMARY KEY,
-    "tripId"             TEXT        NOT NULL REFERENCES "Trip"(id),
-    "userId"             TEXT        NOT NULL REFERENCES "User"(id),
-    "estimatedPickupTime" TIMESTAMPTZ,
-    "pickupOrder"        INTEGER,
-    "createdAt"          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE("tripId", "userId")
+    trip_id              TEXT        NOT NULL REFERENCES trips(id),
+    user_id              TEXT        NOT NULL REFERENCES users(id),
+    estimated_pickup_time TIMESTAMPTZ,
+    pickup_order         INTEGER,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(trip_id, user_id)
 );
 
--- ─── Notification ─────────────────────────────────────────
+-- ─── notifications ────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS "Notification" (
+CREATE TABLE IF NOT EXISTS notifications (
     id          TEXT               PRIMARY KEY,
     type        "NotificationType" NOT NULL,
     title       TEXT               NOT NULL,
     message     TEXT,
     read        BOOLEAN            NOT NULL DEFAULT false,
-    "userId"    TEXT               NOT NULL REFERENCES "User"(id),
-    "createdAt" TIMESTAMPTZ        NOT NULL DEFAULT now(),
-    "updatedAt" TIMESTAMPTZ        NOT NULL DEFAULT now()
+    user_id     TEXT               NOT NULL REFERENCES users(id),
+    created_at  TIMESTAMPTZ        NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ        NOT NULL DEFAULT now()
 );
 
 -- ─── Indexes ──────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_organization_member_org
-    ON "OrganizationMember"("organizationId");
+    ON organization_members(organization_id);
 
 CREATE INDEX IF NOT EXISTS idx_organization_member_user
-    ON "OrganizationMember"("userId");
+    ON organization_members(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_vehicle_org
-    ON "Vehicle"("organizationId");
+    ON vehicles(organization_id);
 
 CREATE INDEX IF NOT EXISTS idx_event_org
-    ON "Event"("organizationId");
+    ON events(organization_id);
 
 CREATE INDEX IF NOT EXISTS idx_event_status
-    ON "Event"(status);
+    ON events(status);
 
 CREATE INDEX IF NOT EXISTS idx_trip_event
-    ON "Trip"("eventId");
+    ON trips(event_id);
 
 CREATE INDEX IF NOT EXISTS idx_trip_driver
-    ON "Trip"("driverId");
+    ON trips(driver_id);
 
 CREATE INDEX IF NOT EXISTS idx_ride_request_event
-    ON "RideRequest"("eventId");
+    ON ride_requests(event_id);
 
 CREATE INDEX IF NOT EXISTS idx_ride_request_passenger
-    ON "RideRequest"("passengerId");
+    ON ride_requests(passenger_id);
 
 CREATE INDEX IF NOT EXISTS idx_passenger_assignment_trip
-    ON "PassengerAssignment"("tripId");
+    ON passenger_assignments(trip_id);
 
 CREATE INDEX IF NOT EXISTS idx_notification_user
-    ON "Notification"("userId");
+    ON notifications(user_id);

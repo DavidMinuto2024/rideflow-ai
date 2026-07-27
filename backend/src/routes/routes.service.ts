@@ -64,14 +64,14 @@ export class RoutesService {
     const waypoints: OSRMWaypoint[] = [];
 
     // Start: trip's own origin (driver start) if available, else event origin
-    if (trip.originLat && trip.originLng) {
+    if (trip.origin_lat && trip.origin_lng) {
       waypoints.push({
-        location: [trip.originLng, trip.originLat],
+        location: [trip.origin_lng, trip.origin_lat],
         name: trip.origin || 'Salida del conductor',
       });
-    } else if (event.originLat && event.originLng) {
+    } else if (event.origin_lat && event.origin_lng) {
       waypoints.push({
-        location: [event.originLng, event.originLat],
+        location: [event.origin_lng, event.origin_lat],
         name: event.origin,
       });
     }
@@ -85,14 +85,14 @@ export class RoutesService {
     }
 
     // End: trip's own destination if available, else event destination
-    if (trip.destLat && trip.destLng) {
+    if (trip.dest_lat && trip.dest_lng) {
       waypoints.push({
-        location: [trip.destLng, trip.destLat],
+        location: [trip.dest_lng, trip.dest_lat],
         name: trip.dest || 'Destino',
       });
-    } else if (event.destLat && event.destLng) {
+    } else if (event.dest_lat && event.dest_lng) {
       waypoints.push({
-        location: [event.destLng, event.destLat],
+        location: [event.dest_lng, event.dest_lat],
         name: event.destination,
       });
     }
@@ -164,10 +164,10 @@ export class RoutesService {
     let duration = 0;
 
     // Prefer trip coordinates, then event coordinates
-    const startLat = trip.originLat ?? event.originLat;
-    const startLng = trip.originLng ?? event.originLng;
-    const endLat = trip.destLat ?? event.destLat;
-    const endLng = trip.destLng ?? event.destLng;
+    const startLat = trip.origin_lat ?? event.origin_lat;
+    const startLng = trip.origin_lng ?? event.origin_lng;
+    const endLat = trip.dest_lat ?? event.dest_lat;
+    const endLng = trip.dest_lng ?? event.dest_lng;
 
     if (startLat && startLng && endLat && endLng) {
       distance = this.haversineDistance(

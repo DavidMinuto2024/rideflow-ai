@@ -50,8 +50,8 @@ export class EventVehiclesController {
   async checkPicoYPlaca(@Param('id') id: string) {
     const ev = await this.eventVehiclesService.findOne(id);
     const active = await this.eventVehiclesService.checkPicoYPlacaForEvent(
-      ev.vehicleId,
-      ev.eventId,
+      ev.vehicle_id,
+      ev.event_id,
     );
     return { picoYPlacaActive: active };
   }
