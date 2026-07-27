@@ -182,6 +182,7 @@ export class InvitationsService {
     const { data: eventVehicle, error: createError } = await this.supabase
       .from('event_vehicles')
       .insert({
+        id: crypto.randomUUID(),
         event_id: eventId,
         vehicle_id: dto.vehicleId,
         driver_id: userId,
@@ -251,6 +252,7 @@ export class InvitationsService {
     const { data: rideRequest, error: createError } = await this.supabase
       .from('ride_requests')
       .insert({
+        id: crypto.randomUUID(),
         event_id: eventId,
         passenger_id: userId,
         pickup_lat: dto.pickupLat ?? null,

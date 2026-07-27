@@ -68,6 +68,7 @@ export class RidesService {
     const { data: request, error: createError } = await this.supabase
       .from('ride_requests')
       .insert({
+        id: crypto.randomUUID(),
         event_id: eventId,
         passenger_id: passengerId,
         pickup_lat: dto.pickupLat ?? null,
@@ -323,22 +324,23 @@ export class RidesService {
       // Create a trip for this vehicle + driver
       const { data: trip, error: tripError } = await this.supabase
         .from('trips')
-        .insert({
-          event_id: eventId,
-          driver_id: vehicle.driver_id,
-          vehicle_id: vehicle.id,
-          origin: event.origin,
-          origin_lat: event.origin_lat,
-          origin_lng: event.origin_lng,
-          dest: event.destination,
-          dest_lat: event.dest_lat,
-          dest_lng: event.dest_lng,
-          notes: `Auto-assigned - ${vehicle.model || vehicle.plate || 'Vehicle'}`,
-        })
-        .select()
-        .single();
+      .insert({
+        id: crypto.randomUUID(),
+        event_id: eventId,
+        driver_id: vehicle.driver_id,
+        vehicle_id: vehicle.id,
+        origin: event.origin,
+        origin_lat: event.origin_lat,
+        origin_lng: event.origin_lng,
+        dest: event.destination,
+        dest_lat: event.dest_lat,
+        dest_lng: event.dest_lng,
+        notes: `Auto-assigned - ${vehicle.model || vehicle.plate || 'Vehicle'}`,
+      })
+      .select()
+      .single();
 
-      if (tripError) this.supabase.handleError(tripError, 'trips');
+    if (tripError) this.supabase.handleError(tripError, 'trips');
 
       // Assign riders to this trip
       for (let i = 0; i < slots && riderIndex < assignable.length; i++) {
@@ -347,12 +349,13 @@ export class RidesService {
         // Create passenger assignment
         const { error: assignmentError } = await this.supabase
           .from('passenger_assignments')
-          .insert({
-            trip_id: trip.id,
-            user_id: request.passenger_id,
-          });
+      .insert({
+        id: crypto.randomUUID(),
+        trip_id: trip.id,
+        user_id: request.passenger_id,
+      });
 
-        if (assignmentError) this.supabase.handleError(assignmentError, 'passenger_assignments');
+    if (assignmentError) this.supabase.handleError(assignmentError, 'passenger_assignments');
 
         // Update ride request status
         const { error: reqUpdateError } = await this.supabase
@@ -529,6 +532,7 @@ export class RidesService {
     const { data: trip, error: tripError } = await this.supabase
       .from('trips')
       .insert({
+        id: crypto.randomUUID(),
         event_id: eventId,
         driver_id: dto.driverId,
         vehicle_id: vehicle.id,
@@ -547,6 +551,7 @@ export class RidesService {
     const { error: assignmentError } = await this.supabase
       .from('passenger_assignments')
       .insert({
+        id: crypto.randomUUID(),
         trip_id: trip.id,
         user_id: dto.passengerId,
       });

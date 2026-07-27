@@ -67,6 +67,7 @@ export class NotificationsService {
     const { data, error } = await this.supabase
       .from('notifications')
       .insert({
+        id: crypto.randomUUID(),
         type: dto.type,
         title: dto.title,
         message: dto.message,
@@ -92,6 +93,7 @@ export class NotificationsService {
     const { data, error } = await this.supabase
       .from('notifications')
       .insert({
+        id: crypto.randomUUID(),
         type: 'ESTIMATED_PICKUP_TIME',
         title: 'Pickup time updated',
         message: `Your estimated pickup time has been updated to ${estimatedPickupTime.toLocaleTimeString()}`,

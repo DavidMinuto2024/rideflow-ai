@@ -60,6 +60,7 @@ export class EventsService {
     const { data: event, error } = await this.supabase
       .from('events')
       .insert({
+        id: crypto.randomUUID(),
         title: dto.title,
         description: dto.description,
         date: new Date(dto.date),
