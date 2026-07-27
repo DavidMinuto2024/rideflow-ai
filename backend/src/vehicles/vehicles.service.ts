@@ -125,14 +125,28 @@ export class VehiclesService {
     }
 
     // Check if vehicle has active trips
-    const { data: activeTrips, error: tripsError } = await this.supabase
+    const { data: vehicleTrips, error: tripsError } = await this.supabase
       .from('trips')
-      .select('id')
-      .eq('vehicle_id', id)
-      .in('event.status', ['DRAFT', 'PUBLISHED', 'OPEN'])
-      .limit(1);
+      .select('id, event_id')
+      .eq('vehicle_id', id);
 
     if (tripsError) this.supabase.handleError(tripsError, 'trips');
+
+    const tripEventIds = (vehicleTrips || []).map((t: any) => t.event_id);
+    let activeTrips: any[] = [];
+    if (tripEventIds.length > 0) {
+      const { data: activeEvents } = await this.supabase
+        .from('events')
+        .select('id')
+        .in('id', tripEventIds)
+        .in('status', ['DRAFT', 'PUBLISHED', 'OPEN']);
+
+      if (activeEvents && activeEvents.length > 0) {
+        activeTrips = vehicleTrips?.filter((t: any) =>
+          activeEvents.some((e: any) => e.id === t.event_id),
+        ) || [];
+      }
+    }
     if (activeTrips && activeTrips.length > 0) {
       throw new ConflictException('Cannot delete vehicle with active trips');
     }
