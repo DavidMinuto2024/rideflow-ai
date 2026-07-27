@@ -7,7 +7,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SuggestionsService } from '../suggestions/suggestions.service';
 import { RequestStatus, Role, EventStatus } from '@prisma/client';
@@ -17,7 +17,7 @@ import { UpdateRideRequestDto } from './dto/update-ride-request.dto';
 @Injectable()
 export class RidesService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
     private readonly notifications: NotificationsService,
     private readonly suggestionsService: SuggestionsService,
   ) {}
@@ -25,7 +25,13 @@ export class RidesService {
   // ─── Ride Requests ─────────────────────────────────────
 
   async createRequest(eventId: string, passengerId: string, dto: CreateRideRequestDto) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id, status, capacity, organization_id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
@@ -35,36 +41,46 @@ export class RidesService {
     }
 
     // Check for existing pending/accepted request by this passenger
-    const existing = await this.prisma.rideRequest.findUnique({
-      where: { eventId_passengerId: { eventId, passengerId } },
-    });
+    const { data: existing, error: existingError } = await this.supabase
+      .from('ride_requests')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('passenger_id', passengerId)
+      .maybeSingle();
+
+    if (existingError) this.supabase.handleError(existingError, 'ride_requests');
     if (existing) {
       throw new ConflictException('You already have a ride request for this event');
     }
 
     // Check event capacity — count accepted requests + assignments
-    const acceptedCount = await this.prisma.rideRequest.count({
-      where: { eventId, status: RequestStatus.ACCEPTED },
-    });
-    if (acceptedCount >= event.capacity) {
+    const { count: acceptedCount, error: countError } = await this.supabase
+      .from('ride_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('status', RequestStatus.ACCEPTED);
+
+    if (countError) this.supabase.handleError(countError, 'ride_requests');
+    if ((acceptedCount ?? 0) >= event.capacity) {
       throw new ConflictException('Event has reached full capacity');
     }
 
-    const request = await this.prisma.rideRequest.create({
-      data: {
-        eventId,
-        passengerId,
-        pickupLat: dto.pickupLat ?? null,
-        pickupLng: dto.pickupLng ?? null,
-        pickupAddress: dto.pickupAddress ?? null,
-      },
-      include: {
-        passenger: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const { data: request, error: createError } = await this.supabase
+      .from('ride_requests')
+      .insert({
+        event_id: eventId,
+        passenger_id: passengerId,
+        pickup_lat: dto.pickupLat ?? null,
+        pickup_lng: dto.pickupLng ?? null,
+        pickup_address: dto.pickupAddress ?? null,
+      })
+      .select('*, passenger:users!inner(id, name, email)')
+      .single();
+
+    if (createError) this.supabase.handleError(createError, 'ride_requests');
 
     // Notify event organizers/admins
-    await this.notifyEventAdmins(event.organizationId, 'RIDE_REQUESTED', {
+    await this.notifyEventAdmins(event.organization_id, 'RIDE_REQUESTED', {
       title: 'New ride request',
       message: `${request.passenger.name} requested a ride`,
       eventId,
@@ -74,19 +90,25 @@ export class RidesService {
   }
 
   async findRequestsByEvent(eventId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
-    return this.prisma.rideRequest.findMany({
-      where: { eventId },
-      include: {
-        passenger: { select: { id: true, name: true, email: true, phone: true } },
-        trip: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const { data, error } = await this.supabase
+      .from('ride_requests')
+      .select('*, passenger:users!inner(id, name, email, phone), trip:trips(*)')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true });
+
+    if (error) this.supabase.handleError(error, 'ride_requests');
+    return data || [];
   }
 
   async updateRequestStatus(
@@ -94,27 +116,26 @@ export class RidesService {
     dto: UpdateRideRequestDto,
     userId: string,
   ) {
-    const request = await this.prisma.rideRequest.findUnique({
-      where: { id },
-      include: {
-        event: { include: { organization: true } },
-        passenger: true,
-      },
-    });
+    const { data: request, error: requestError } = await this.supabase
+      .from('ride_requests')
+      .select('*, event:events!inner(*, organization:organizations(*)), passenger:users(*)')
+      .eq('id', id)
+      .maybeSingle();
 
+    if (requestError) this.supabase.handleError(requestError, 'ride_requests');
     if (!request) {
       throw new NotFoundException(`Ride request ${id} not found`);
     }
 
     // Verify authorizer is driver or admin for this event's org
-    const authorizer = await this.prisma.organizationMember.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: request.event.organizationId,
-          userId,
-        },
-      },
-    });
+    const { data: authorizer, error: authError } = await this.supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', request.event.organization_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (authError) this.supabase.handleError(authError, 'organization_members');
 
     if (
       !authorizer ||
@@ -146,24 +167,26 @@ export class RidesService {
 
     // If approving, check capacity
     if (dto.status === RequestStatus.ACCEPTED) {
-      const acceptedCount = await this.prisma.rideRequest.count({
-        where: {
-          eventId: request.eventId,
-          status: RequestStatus.ACCEPTED,
-        },
-      });
-      if (acceptedCount >= request.event.capacity) {
+      const { count: acceptedCount, error: countError } = await this.supabase
+        .from('ride_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', request.event_id)
+        .eq('status', RequestStatus.ACCEPTED);
+
+      if (countError) this.supabase.handleError(countError, 'ride_requests');
+      if ((acceptedCount ?? 0) >= request.event.capacity) {
         throw new ConflictException('Event has reached full capacity');
       }
     }
 
-    const updated = await this.prisma.rideRequest.update({
-      where: { id },
-      data: { status: dto.status },
-      include: {
-        passenger: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const { data: updated, error: updateError } = await this.supabase
+      .from('ride_requests')
+      .update({ status: dto.status })
+      .eq('id', id)
+      .select('*, passenger:users!inner(id, name, email)')
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'ride_requests');
 
     // Create notification for passenger
     const notifTitle =
@@ -184,12 +207,12 @@ export class RidesService {
       type: notifType,
       title: notifTitle,
       message: `Your ride request for "${request.event.title}" was ${dto.status.toLowerCase()}`,
-      userId: request.passengerId,
+      userId: request.passenger_id,
     });
 
     // On cancellation, trigger re-optimization and notify affected passengers
     if (dto.status === RequestStatus.CANCELLED) {
-      await this.handleCancellationReoptimization(request.eventId);
+      await this.handleCancellationReoptimization(request.event_id);
     }
 
     return updated;
@@ -198,24 +221,26 @@ export class RidesService {
   // ─── Auto-Assignment Engine ────────────────────────────
 
   async autoAssign(eventId: string, userId: string) {
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-      include: { organization: true },
-    });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('*, organization:organizations(*)')
+      .eq('id', eventId)
+      .maybeSingle();
 
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
     // Verify authorizer has rights
-    const authorizer = await this.prisma.organizationMember.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: event.organizationId,
-          userId,
-        },
-      },
-    });
+    const { data: authorizer, error: authError } = await this.supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', event.organization_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (authError) this.supabase.handleError(authError, 'organization_members');
 
     if (
       !authorizer ||
@@ -229,37 +254,44 @@ export class RidesService {
     }
 
     // Get all PENDING ride requests for this event
-    const pendingRequests = await this.prisma.rideRequest.findMany({
-      where: { eventId, status: RequestStatus.PENDING },
-      include: { passenger: true },
-    });
+    const { data: pendingRequests, error: pendingError } = await this.supabase
+      .from('ride_requests')
+      .select('*, passenger:users(*)')
+      .eq('event_id', eventId)
+      .eq('status', RequestStatus.PENDING);
 
-    if (pendingRequests.length === 0) {
+    if (pendingError) this.supabase.handleError(pendingError, 'ride_requests');
+
+    if (!pendingRequests || pendingRequests.length === 0) {
       return { message: 'No pending requests to assign', assignments: [] };
     }
 
     // Get available vehicles with drivers from this org
-    const availableVehicles = await this.prisma.vehicle.findMany({
-      where: {
-        organizationId: event.organizationId,
-        isActive: true,
-        driverId: { not: null },
-      },
-      include: { driver: true },
-    });
+    const { data: availableVehicles, error: vehiclesError } = await this.supabase
+      .from('vehicles')
+      .select('*, driver:users(*)')
+      .eq('organization_id', event.organization_id)
+      .eq('is_active', true)
+      .not('driver_id', 'is', null);
 
-    if (availableVehicles.length === 0) {
+    if (vehiclesError) this.supabase.handleError(vehiclesError, 'vehicles');
+
+    if (!availableVehicles || availableVehicles.length === 0) {
       throw new BadRequestException(
         'No available vehicles with drivers in this organization',
       );
     }
 
     // Get already-accepted requests to know remaining capacity
-    const acceptedCount = await this.prisma.rideRequest.count({
-      where: { eventId, status: RequestStatus.ACCEPTED },
-    });
+    const { count: acceptedCount, error: countError } = await this.supabase
+      .from('ride_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('status', RequestStatus.ACCEPTED);
 
-    const remainingCapacity = event.capacity - acceptedCount;
+    if (countError) this.supabase.handleError(countError, 'ride_requests');
+
+    const remainingCapacity = event.capacity - (acceptedCount ?? 0);
     const assignable = pendingRequests.slice(0, remainingCapacity);
 
     if (assignable.length === 0) {
@@ -289,52 +321,61 @@ export class RidesService {
       if (slots === 0) break;
 
       // Create a trip for this vehicle + driver
-      const trip = await this.prisma.trip.create({
-        data: {
-          eventId,
-          driverId: vehicle.driverId!,
-          vehicleId: vehicle.id,
+      const { data: trip, error: tripError } = await this.supabase
+        .from('trips')
+        .insert({
+          event_id: eventId,
+          driver_id: vehicle.driver_id,
+          vehicle_id: vehicle.id,
           origin: event.origin,
-          originLat: event.originLat,
-          originLng: event.originLng,
+          origin_lat: event.origin_lat,
+          origin_lng: event.origin_lng,
           dest: event.destination,
-          destLat: event.destLat,
-          destLng: event.destLng,
+          dest_lat: event.dest_lat,
+          dest_lng: event.dest_lng,
           notes: `Auto-assigned - ${vehicle.model || vehicle.plate || 'Vehicle'}`,
-        },
-      });
+        })
+        .select()
+        .single();
+
+      if (tripError) this.supabase.handleError(tripError, 'trips');
 
       // Assign riders to this trip
       for (let i = 0; i < slots && riderIndex < assignable.length; i++) {
         const request = assignable[riderIndex];
 
-        await this.prisma.$transaction([
-          this.prisma.passengerAssignment.create({
-            data: {
-              tripId: trip.id,
-              userId: request.passengerId,
-            },
-          }),
-          this.prisma.rideRequest.update({
-            where: { id: request.id },
-            data: {
-              status: RequestStatus.ACCEPTED,
-              tripId: trip.id,
-            },
-          }),
-        ]);
+        // Create passenger assignment
+        const { error: assignmentError } = await this.supabase
+          .from('passenger_assignments')
+          .insert({
+            trip_id: trip.id,
+            user_id: request.passenger_id,
+          });
+
+        if (assignmentError) this.supabase.handleError(assignmentError, 'passenger_assignments');
+
+        // Update ride request status
+        const { error: reqUpdateError } = await this.supabase
+          .from('ride_requests')
+          .update({
+            status: RequestStatus.ACCEPTED,
+            trip_id: trip.id,
+          })
+          .eq('id', request.id);
+
+        if (reqUpdateError) this.supabase.handleError(reqUpdateError, 'ride_requests');
 
         // Notify passenger
         await this.notifications.create({
           type: 'TRIP_ASSIGNED',
           title: 'Trip assigned',
           message: `You've been assigned to a trip for "${event.title}"`,
-          userId: request.passengerId,
+          userId: request.passenger_id,
         });
 
         assignments.push({
           tripId: trip.id,
-          passengerId: request.passengerId,
+          passengerId: request.passenger_id,
           passengerName: request.passenger.name,
           vehiclePlate: vehicle.plate,
           driverName: vehicle.driver?.name || 'Unknown',
@@ -353,53 +394,47 @@ export class RidesService {
   // ─── Trips ─────────────────────────────────────────────
 
   async findTripsByEvent(eventId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
-    const trips = await this.prisma.trip.findMany({
-      where: { eventId },
-      include: {
-        driver: { select: { id: true, name: true, email: true } },
-        vehicle: true,
-        rideRequests: {
-          include: {
-            passenger: { select: { id: true, name: true, email: true } },
-          },
-        },
-        passengerAssignments: {
-          include: { user: { select: { id: true, name: true, email: true } } },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const { data: trips, error } = await this.supabase
+      .from('trips')
+      .select('*, driver:users!inner(id, name, email), vehicle:vehicles(*), ride_requests:ride_requests(*, passenger:users!inner(id, name, email)), passenger_assignments:passenger_assignments(*, user:users!inner(id, name, email))')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true });
 
-    return trips.map((t) => this.mapTripResponse(t));
+    if (error) this.supabase.handleError(error, 'trips');
+    return (trips || []).map((t) => this.mapTripResponse(t));
   }
 
   async findTripById(eventId: string, tripId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
-    const trip = await this.prisma.trip.findFirst({
-      where: { id: tripId, eventId },
-      include: {
-        driver: { select: { id: true, name: true, email: true, phone: true } },
-        vehicle: true,
-        rideRequests: {
-          include: {
-            passenger: { select: { id: true, name: true, email: true } },
-          },
-        },
-        passengerAssignments: {
-          include: { user: { select: { id: true, name: true, email: true, phone: true } } },
-        },
-      },
-    });
+    const { data: trip, error } = await this.supabase
+      .from('trips')
+      .select('*, driver:users!inner(id, name, email, phone), vehicle:vehicles(*), ride_requests:ride_requests(*, passenger:users!inner(id, name, email)), passenger_assignments:passenger_assignments(*, user:users!inner(id, name, email, phone))')
+      .eq('id', tripId)
+      .eq('event_id', eventId)
+      .maybeSingle();
 
+    if (error) this.supabase.handleError(error, 'trips');
     if (!trip) {
       throw new NotFoundException(`Trip ${tripId} not found in event ${eventId}`);
     }
@@ -416,23 +451,26 @@ export class RidesService {
     dto: { passengerId: string; driverId: string },
     userId: string,
   ) {
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-      include: { organization: true },
-    });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('*, organization:organizations(*)')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
     // Verify authorizer
-    const authorizer = await this.prisma.organizationMember.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: event.organizationId,
-          userId,
-        },
-      },
-    });
+    const { data: authorizer, error: authError } = await this.supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', event.organization_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (authError) this.supabase.handleError(authError, 'organization_members');
     if (
       !authorizer ||
       (authorizer.role !== Role.ORG_ADMIN &&
@@ -445,15 +483,14 @@ export class RidesService {
     }
 
     // Find the ride request (must be ACCEPTED or PENDING)
-    const rideRequest = await this.prisma.rideRequest.findUnique({
-      where: {
-        eventId_passengerId: {
-          eventId,
-          passengerId: dto.passengerId,
-        },
-      },
-      include: { passenger: true },
-    });
+    const { data: rideRequest, error: reqError } = await this.supabase
+      .from('ride_requests')
+      .select('*, passenger:users(*)')
+      .eq('event_id', eventId)
+      .eq('passenger_id', dto.passengerId)
+      .maybeSingle();
+
+    if (reqError) this.supabase.handleError(reqError, 'ride_requests');
     if (!rideRequest) {
       throw new NotFoundException(
         `No ride request found for passenger ${dto.passengerId} in event ${eventId}`,
@@ -464,17 +501,21 @@ export class RidesService {
         `Cannot assign a ${rideRequest.status} request`,
       );
     }
-    if (rideRequest.tripId) {
+    if (rideRequest.trip_id) {
       throw new ConflictException(
         'Passenger is already assigned to a trip',
       );
     }
 
     // Find driver's vehicle
-    const vehicle = await this.prisma.vehicle.findFirst({
-      where: { driverId: dto.driverId, isActive: true },
-      include: { driver: true },
-    });
+    const { data: vehicle, error: vehicleError } = await this.supabase
+      .from('vehicles')
+      .select('*, driver:users(*)')
+      .eq('driver_id', dto.driverId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (vehicleError) this.supabase.handleError(vehicleError, 'vehicles');
     if (!vehicle) {
       throw new BadRequestException(
         `Driver ${dto.driverId} has no active vehicle`,
@@ -485,39 +526,45 @@ export class RidesService {
     const driverStartName = `${vehicle.driver?.name || 'Conductor'} (${vehicle.model || vehicle.plate || 'Carro'})`;
 
     // Create the trip with driver's coordinates
-    // We store the driver's starting point in originLat/Lng
-    // and the final destination in destLat/Lng (event destination)
-    const trip = await this.prisma.trip.create({
-      data: {
-        eventId,
-        driverId: dto.driverId,
-        vehicleId: vehicle.id,
+    const { data: trip, error: tripError } = await this.supabase
+      .from('trips')
+      .insert({
+        event_id: eventId,
+        driver_id: dto.driverId,
+        vehicle_id: vehicle.id,
         origin: driverStartName,
         dest: event.destination,
-        destLat: event.destLat,
-        destLng: event.destLng,
+        dest_lat: event.dest_lat,
+        dest_lng: event.dest_lng,
         notes: `Asignación directa: ${driverStartName}`,
-      },
-    });
+      })
+      .select()
+      .single();
 
-    // Assign passenger to trip + update request
-    const assignment = await this.prisma.$transaction([
-      this.prisma.passengerAssignment.create({
-        data: {
-          tripId: trip.id,
-          userId: dto.passengerId,
-        },
-      }),
-      this.prisma.rideRequest.update({
-        where: { id: rideRequest.id },
-        data: {
-          tripId: trip.id,
-          status: rideRequest.status === RequestStatus.PENDING
-            ? RequestStatus.ACCEPTED
-            : undefined,
-        },
-      }),
-    ]);
+    if (tripError) this.supabase.handleError(tripError, 'trips');
+
+    // Create passenger assignment
+    const { error: assignmentError } = await this.supabase
+      .from('passenger_assignments')
+      .insert({
+        trip_id: trip.id,
+        user_id: dto.passengerId,
+      });
+
+    if (assignmentError) this.supabase.handleError(assignmentError, 'passenger_assignments');
+
+    // Update ride request
+    const updateData: Record<string, unknown> = { trip_id: trip.id };
+    if (rideRequest.status === RequestStatus.PENDING) {
+      updateData['status'] = RequestStatus.ACCEPTED;
+    }
+
+    const { error: reqUpdateError } = await this.supabase
+      .from('ride_requests')
+      .update(updateData)
+      .eq('id', rideRequest.id);
+
+    if (reqUpdateError) this.supabase.handleError(reqUpdateError, 'ride_requests');
 
     // Notify passenger
     await this.notifications.create({
@@ -527,16 +574,14 @@ export class RidesService {
       userId: dto.passengerId,
     });
 
-    const newTrip = await this.prisma.trip.findUnique({
-      where: { id: trip.id },
-      include: {
-        driver: { select: { id: true, name: true, email: true } },
-        vehicle: true,
-        passengerAssignments: {
-          include: { user: { select: { id: true, name: true, email: true } } },
-        },
-      },
-    });
+    // Fetch the complete trip for response
+    const { data: newTrip, error: fetchError } = await this.supabase
+      .from('trips')
+      .select('*, driver:users!inner(id, name, email), vehicle:vehicles(*), passenger_assignments:passenger_assignments(*, user:users!inner(id, name, email))')
+      .eq('id', trip.id)
+      .maybeSingle();
+
+    if (fetchError) this.supabase.handleError(fetchError, 'trips');
 
     return this.mapTripResponse(newTrip!);
   }
@@ -590,19 +635,22 @@ export class RidesService {
     data: { title: string; message: string; eventId: string },
   ) {
     // Notify all ORG_ADMIN + DRIVER members of this org
-    const admins = await this.prisma.organizationMember.findMany({
-      where: {
-        organizationId,
-        role: { in: [Role.ORG_ADMIN, Role.SUPER_ADMIN] },
-      },
-    });
+    const { data: admins, error } = await this.supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId)
+      .in('role', [Role.ORG_ADMIN, Role.SUPER_ADMIN]);
+
+    if (error) this.supabase.handleError(error, 'organization_members');
+
+    if (!admins) return;
 
     for (const admin of admins) {
       await this.notifications.create({
         type,
         title: data.title,
         message: data.message,
-        userId: admin.userId,
+        userId: admin.user_id,
       });
     }
   }
