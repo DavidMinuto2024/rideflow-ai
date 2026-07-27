@@ -57,36 +57,62 @@ export class DashboardService {
       this.supabase.handleError(participantsError, 'organization_members');
     }
 
+    // ─── Get all event IDs across user's organizations ───
+    const { data: orgEventIds } = await this.supabase
+      .from('events')
+      .select('id')
+      .in('organization_id', organizationIds);
+
+    const eventIds = (orgEventIds || []).map((e: any) => e.id);
+
     // ─── Trips today (events happening today) ───
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    const { count: tripsToday, error: tripsTodayError } =
-      await this.supabase
-        .from('trips')
-        .select('*', { count: 'exact', head: true })
-        .in('event.organization_id', organizationIds)
-        .gte('event.date', todayStart.toISOString())
-        .lte('event.date', todayEnd.toISOString());
+    let tripsToday = 0;
+    if (eventIds.length > 0) {
+      // Fetch event IDs happening today for the user's orgs
+      const { data: todayEvents } = await this.supabase
+        .from('events')
+        .select('id')
+        .in('id', eventIds)
+        .gte('date', todayStart.toISOString())
+        .lte('date', todayEnd.toISOString());
 
-    if (tripsTodayError) {
-      this.logger.warn(
-        `Trips today count failed: ${tripsTodayError.message}`,
-      );
+      const todayEventIds = (todayEvents || []).map((e: any) => e.id);
+
+      if (todayEventIds.length > 0) {
+        const { count, error: tripsTodayError } =
+          await this.supabase
+            .from('trips')
+            .select('*', { count: 'exact', head: true })
+            .in('event_id', todayEventIds);
+
+        if (tripsTodayError) {
+          this.logger.warn(
+            `Trips today count failed: ${tripsTodayError.message}`,
+          );
+        }
+        tripsToday = count || 0;
+      }
     }
 
     // ─── Pending ride requests in active events ───
-    const { count: pendingRequests, error: pendingError } =
-      await this.supabase
-        .from('ride_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'PENDING')
-        .in('event.organization_id', organizationIds);
+    let pendingRequests = 0;
+    if (eventIds.length > 0) {
+      const { count, error: pendingError } =
+        await this.supabase
+          .from('ride_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'PENDING')
+          .in('event_id', eventIds);
 
-    if (pendingError) {
-      this.supabase.handleError(pendingError, 'ride_requests');
+      if (pendingError) {
+        this.supabase.handleError(pendingError, 'ride_requests');
+      }
+      pendingRequests = count || 0;
     }
 
     // ─── Vehicle utilization ───
@@ -106,15 +132,19 @@ export class DashboardService {
     );
 
     // Count all accepted ride requests across user's orgs
-    const { count: acceptedRequests, error: acceptedError } =
-      await this.supabase
-        .from('ride_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'ACCEPTED')
-        .in('event.organization_id', organizationIds);
+    let acceptedRequests = 0;
+    if (eventIds.length > 0) {
+      const { count, error: acceptedError } =
+        await this.supabase
+          .from('ride_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'ACCEPTED')
+          .in('event_id', eventIds);
 
-    if (acceptedError) {
-      this.supabase.handleError(acceptedError, 'ride_requests');
+      if (acceptedError) {
+        this.supabase.handleError(acceptedError, 'ride_requests');
+      }
+      acceptedRequests = count || 0;
     }
 
     const vehicleUtilization =
