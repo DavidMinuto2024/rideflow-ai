@@ -64,25 +64,27 @@ export class InvitationsService {
    * Passengers: creates a RideRequest record.
    */
   async joinEvent(token: string, userId: string, dto: JoinEventDto) {
+    // Fetch event by token
     const { data: event, error } = await this.supabase
       .from('events')
-      .select('*, organization:organizations!inner(*, members:organization_members!inner(*))')
+      .select('*, organization:organizations(*)')
       .eq('invite_token', token)
-      .eq('organization.members.user_id', userId)
       .maybeSingle();
 
     if (error) this.supabase.handleError(error, 'events');
     if (!event) {
-      // Check if the issue is a bad token vs. non-membership
-      const { data: tokenCheck } = await this.supabase
-        .from('events')
-        .select('id')
-        .eq('invite_token', token)
-        .maybeSingle();
+      throw new NotFoundException('Invalid invite token');
+    }
 
-      if (!tokenCheck) {
-        throw new NotFoundException('Invalid invite token');
-      }
+    // Verify the user is a member of the event's organization
+    const { data: membership } = await this.supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', event.organization_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!membership) {
       throw new ForbiddenException('You are not a member of this organization');
     }
 
