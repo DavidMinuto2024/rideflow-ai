@@ -2,7 +2,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 
 /**
@@ -26,40 +26,58 @@ export type NotificationType =
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly supabase: SupabaseDataService) {}
 
   async findByUser(userId: string) {
-    return this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const { data, error } = await this.supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) this.supabase.handleError(error, 'notifications');
+    return data || [];
   }
 
   async markAsRead(id: string, userId: string) {
-    const notification = await this.prisma.notification.findFirst({
-      where: { id, userId },
-    });
+    const { data: notification, error: findError } = await this.supabase
+      .from('notifications')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .maybeSingle();
 
+    if (findError) this.supabase.handleError(findError, 'notifications');
     if (!notification) {
       throw new NotFoundException(`Notification ${id} not found`);
     }
 
-    return this.prisma.notification.update({
-      where: { id },
-      data: { read: true },
-    });
+    const { data: updated, error: updateError } = await this.supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'notifications');
+    return updated;
   }
 
   async create(dto: CreateNotificationDto) {
-    return this.prisma.notification.create({
-      data: {
-        type: dto.type as any,
+    const { data, error } = await this.supabase
+      .from('notifications')
+      .insert({
+        type: dto.type,
         title: dto.title,
         message: dto.message,
-        userId: dto.userId,
+        user_id: dto.userId,
         read: dto.read ?? false,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) this.supabase.handleError(error, 'notifications');
+    return data;
   }
 
   /**
@@ -71,13 +89,18 @@ export class NotificationsService {
     passengerId: string,
     estimatedPickupTime: Date,
   ) {
-    return this.prisma.notification.create({
-      data: {
+    const { data, error } = await this.supabase
+      .from('notifications')
+      .insert({
         type: 'ESTIMATED_PICKUP_TIME',
         title: 'Pickup time updated',
         message: `Your estimated pickup time has been updated to ${estimatedPickupTime.toLocaleTimeString()}`,
-        userId: passengerId,
-      },
-    });
+        user_id: passengerId,
+      })
+      .select()
+      .single();
+
+    if (error) this.supabase.handleError(error, 'notifications');
+    return data;
   }
 }

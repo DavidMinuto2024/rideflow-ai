@@ -4,88 +4,117 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { RegisterVehicleDto, UpdateEventVehicleDto } from './dto/register-vehicle.dto';
 
 @Injectable()
 export class EventVehiclesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly supabase: SupabaseDataService) {}
 
   /**
    * Register a vehicle for a specific event.
    * Computes pico y placa status based on event date and plate.
    */
   async register(eventId: string, driverId: string, dto: RegisterVehicleDto) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id, date')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
-    const vehicle = await this.prisma.vehicle.findFirst({
-      where: { id: dto.vehicleId, driverId },
-    });
+    const { data: vehicle, error: vehicleError } = await this.supabase
+      .from('vehicles')
+      .select('id, plate')
+      .eq('id', dto.vehicleId)
+      .eq('driver_id', driverId)
+      .maybeSingle();
+
+    if (vehicleError) this.supabase.handleError(vehicleError, 'vehicles');
     if (!vehicle) {
       throw new BadRequestException('Vehicle not found or not assigned to you');
     }
 
     // Check for duplicate registration
-    const existing = await this.prisma.eventVehicle.findUnique({
-      where: { eventId_vehicleId: { eventId, vehicleId: dto.vehicleId } },
-    });
+    const { data: existing, error: existingError } = await this.supabase
+      .from('event_vehicles')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('vehicle_id', dto.vehicleId)
+      .maybeSingle();
+
+    if (existingError) this.supabase.handleError(existingError, 'event_vehicles');
     if (existing) {
       throw new ConflictException('Vehicle already registered for this event');
     }
 
     const picoYPlaca = this.checkPicoYPlaca(vehicle.plate, event.date);
 
-    return this.prisma.eventVehicle.create({
-      data: {
-        eventId,
-        vehicleId: dto.vehicleId,
-        driverId,
-        startLocation: dto.startLocation,
-        startLat: dto.startLat,
-        startLng: dto.startLng,
-        picoYPlaca,
-      },
-      include: {
-        vehicle: true,
-        event: { select: { id: true, title: true, date: true } },
-      },
-    });
+    const { data: eventVehicle, error: createError } = await this.supabase
+      .from('event_vehicles')
+      .insert({
+        event_id: eventId,
+        vehicle_id: dto.vehicleId,
+        driver_id: driverId,
+        start_location: dto.startLocation,
+        start_lat: dto.startLat,
+        start_lng: dto.startLng,
+        pico_y_placa: picoYPlaca,
+      })
+      .select('*, vehicle:vehicles(*), event:events(id, title, date)')
+      .single();
+
+    if (createError) this.supabase.handleError(createError, 'event_vehicles');
+    return eventVehicle;
   }
 
   /**
    * Find all vehicles registered for an event.
    */
   async findByEvent(eventId: string) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
 
-    return this.prisma.eventVehicle.findMany({
-      where: { eventId },
-      include: {
-        vehicle: true,
-        driver: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const { data, error } = await this.supabase
+      .from('event_vehicles')
+      .select('*, vehicle:vehicles(*), driver:users(id, name, email)')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true });
+
+    if (error) this.supabase.handleError(error, 'event_vehicles');
+    return data || [];
   }
 
   /**
    * Find a single EventVehicle by ID.
    */
   async findOne(id: string) {
-    const eventVehicle = await this.prisma.eventVehicle.findUnique({
-      where: { id },
-      include: {
-        vehicle: true,
-        driver: { select: { id: true, name: true, email: true } },
-        event: { select: { id: true, title: true, date: true } },
-      },
-    });
+    const { data: eventVehicle, error } = await this.supabase
+      .from('event_vehicles')
+      .select(
+        '*, vehicle:vehicles(*), driver:users(id, name, email), event:events(id, title, date)',
+      )
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new NotFoundException(`EventVehicle ${id} not found`);
+      }
+      this.supabase.handleError(error, 'event_vehicles');
+    }
 
     if (!eventVehicle) {
       throw new NotFoundException(`EventVehicle ${id} not found`);
@@ -98,39 +127,53 @@ export class EventVehiclesService {
    * Update an EventVehicle's start location.
    */
   async update(id: string, dto: UpdateEventVehicleDto) {
-    const eventVehicle = await this.prisma.eventVehicle.findUnique({
-      where: { id },
-    });
-    if (!eventVehicle) {
+    const { data: existing, error: findError } = await this.supabase
+      .from('event_vehicles')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'event_vehicles');
+    if (!existing) {
       throw new NotFoundException(`EventVehicle ${id} not found`);
     }
 
-    return this.prisma.eventVehicle.update({
-      where: { id },
-      data: {
-        startLocation: dto.startLocation,
-        startLat: dto.startLat,
-        startLng: dto.startLng,
-      },
-      include: {
-        vehicle: true,
-        driver: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const { data: updated, error: updateError } = await this.supabase
+      .from('event_vehicles')
+      .update({
+        start_location: dto.startLocation,
+        start_lat: dto.startLat,
+        start_lng: dto.startLng,
+      })
+      .eq('id', id)
+      .select('*, vehicle:vehicles(*), driver:users(id, name, email)')
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'event_vehicles');
+    return updated;
   }
 
   /**
    * Remove a vehicle registration from an event.
    */
   async remove(id: string) {
-    const eventVehicle = await this.prisma.eventVehicle.findUnique({
-      where: { id },
-    });
-    if (!eventVehicle) {
+    const { data: existing, error: findError } = await this.supabase
+      .from('event_vehicles')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'event_vehicles');
+    if (!existing) {
       throw new NotFoundException(`EventVehicle ${id} not found`);
     }
 
-    await this.prisma.eventVehicle.delete({ where: { id } });
+    const { error: deleteError } = await this.supabase
+      .from('event_vehicles')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) this.supabase.handleError(deleteError, 'event_vehicles');
     return { deleted: true };
   }
 
@@ -172,16 +215,24 @@ export class EventVehiclesService {
    * Returns boolean — non-blocking alert.
    */
   async checkPicoYPlacaForEvent(vehicleId: string, eventId: string): Promise<boolean> {
-    const vehicle = await this.prisma.vehicle.findUnique({
-      where: { id: vehicleId },
-    });
+    const { data: vehicle, error: vehicleError } = await this.supabase
+      .from('vehicles')
+      .select('id, plate')
+      .eq('id', vehicleId)
+      .maybeSingle();
+
+    if (vehicleError) this.supabase.handleError(vehicleError, 'vehicles');
     if (!vehicle) {
       throw new NotFoundException(`Vehicle ${vehicleId} not found`);
     }
 
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-    });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('id, date')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${eventId} not found`);
     }
