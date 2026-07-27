@@ -28,6 +28,7 @@ export class OrganizationsService {
     const { data: organization, error: orgError } = await this.supabase
       .from('organizations')
       .insert({
+        id: crypto.randomUUID(),
         name: dto.name,
         slug: dto.slug,
         logo: dto.logo,
@@ -47,6 +48,7 @@ export class OrganizationsService {
     const { error: memberError } = await this.supabase
       .from('organization_members')
       .insert({
+        id: crypto.randomUUID(),
         role: 'ORG_ADMIN',
         organization_id: organization!.id,
         user_id: userId,

@@ -156,8 +156,8 @@ export class RoutesService {
   }
 
   private async fallbackRoute(
-    event: { originLat?: number | null; originLng?: number | null; destLat?: number | null; destLng?: number | null; origin: string; destination: string },
-    trip: { id: string; originLat?: number | null; originLng?: number | null; destLat?: number | null; destLng?: number | null },
+    event: { origin_lat?: number | null; origin_lng?: number | null; dest_lat?: number | null; dest_lng?: number | null; origin: string; destination: string },
+    trip: { id: string; origin_lat?: number | null; origin_lng?: number | null; dest_lat?: number | null; dest_lng?: number | null },
   ) {
     // Calculate straight-line distance using haversine formula
     let distance = 0;

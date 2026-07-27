@@ -21,6 +21,7 @@ export class VehiclesService {
     const { data, error } = await this.supabase
       .from('vehicles')
       .insert({
+        id: crypto.randomUUID(),
         plate: dto.plate,
         model: dto.model,
         capacity: dto.capacity ?? 4,
