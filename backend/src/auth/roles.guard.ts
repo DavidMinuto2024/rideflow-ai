@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { ROLES_KEY } from './decorators/roles.decorator';
 
 /**
@@ -23,7 +23,7 @@ import { ROLES_KEY } from './decorators/roles.decorator';
 export class RolesGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -48,14 +48,14 @@ export class RolesGuard implements CanActivate {
 
     if (orgId) {
       // Check role in the specific organization
-      const member = await this.prisma.organizationMember.findUnique({
-        where: {
-          organizationId_userId: {
-            organizationId: orgId,
-            userId: user.id,
-          },
-        },
-      });
+      const { data: member, error: memberError } = await this.supabase
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', orgId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (memberError) this.supabase.handleError(memberError, 'organization_members');
 
       if (!member || !requiredRoles.includes(member.role)) {
         throw new ForbiddenException(
@@ -68,14 +68,15 @@ export class RolesGuard implements CanActivate {
       request.organizationId = orgId;
     } else {
       // No org context — check if user has the role in ANY org
-      const memberships = await this.prisma.organizationMember.findMany({
-        where: {
-          userId: user.id,
-          role: { in: requiredRoles },
-        },
-      });
+      const { data: memberships, error: membershipsError } = await this.supabase
+        .from('organization_members')
+        .select('role, organization_id')
+        .eq('user_id', user.id)
+        .in('role', requiredRoles);
 
-      if (memberships.length === 0) {
+      if (membershipsError) this.supabase.handleError(membershipsError, 'organization_members');
+
+      if (!memberships || memberships.length === 0) {
         throw new ForbiddenException(
           `Requires one of: ${requiredRoles.join(', ')}`,
         );
@@ -83,7 +84,7 @@ export class RolesGuard implements CanActivate {
 
       // Use the first matching membership for context
       request.userRole = memberships[0].role;
-      request.organizationId = memberships[0].organizationId;
+      request.organizationId = memberships[0].organization_id;
     }
 
     return true;

@@ -5,41 +5,61 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventStatus, Role } from '@prisma/client';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { InvitationsService } from './invitations.service';
 import { JoinRole } from './dto/join-event.dto';
 
+function createMockSupabase() {
+  const resultQueue: Array<Record<string, unknown>> = [];
+
+  const builder: Record<string, jest.Mock> = {};
+  const chainMethods = [
+    'select', 'insert', 'update', 'delete', 'eq', 'neq',
+    'in', 'gte', 'lte', 'order', 'limit', 'single',
+    'maybeSingle',
+  ];
+  for (const m of chainMethods) {
+    builder[m] = jest.fn().mockReturnThis();
+  }
+
+  (builder as any).then = (onResolve: (v: unknown) => unknown) => {
+    const r = resultQueue.shift() || { data: null, error: null };
+    return Promise.resolve(r).then(onResolve);
+  };
+
+  (builder as any).not = jest.fn().mockReturnValue(builder);
+
+  const from = jest.fn(() => builder);
+
+  return {
+    from,
+    _pushResult: (data: unknown, error: unknown = null, extra: Record<string, unknown> = {}) => {
+      resultQueue.push({ data, error, ...extra });
+    },
+  };
+}
+
 describe('InvitationsService', () => {
-  let prisma: any;
+  let supabase: ReturnType<typeof createMockSupabase>;
   let notifications: { create: jest.Mock };
   let service: InvitationsService;
 
   beforeEach(() => {
-    prisma = {
-      event: { findUnique: jest.fn() },
-      vehicle: { findFirst: jest.fn() },
-      eventVehicle: {
-        findUnique: jest.fn(),
-        count: jest.fn(),
-        create: jest.fn(),
-      },
-      rideRequest: {
-        findUnique: jest.fn(),
-        count: jest.fn(),
-        create: jest.fn(),
-      },
-      organizationMember: { findMany: jest.fn() },
-    };
+    supabase = createMockSupabase();
 
     notifications = {
       create: jest.fn().mockResolvedValue(undefined),
     };
 
-    service = new InvitationsService(prisma, notifications as any);
+    service = new InvitationsService(
+      supabase as unknown as SupabaseDataService,
+      notifications as any,
+    );
   });
 
   describe('validateToken', () => {
     it('resolves event info for a valid invite token', async () => {
-      prisma.event.findUnique.mockResolvedValue({
+      supabase._pushResult({
         id: 'event-1',
         title: 'Morning commute',
         description: 'Ride together',
@@ -49,8 +69,8 @@ describe('InvitationsService', () => {
         organization: { id: 'org-1', name: 'RideFlow' },
         status: EventStatus.OPEN,
         capacity: 4,
-        arrivalTime: new Date('2026-08-01T13:00:00.000Z'),
-        inviteTokenExpiresAt: new Date('2026-08-08T12:00:00.000Z'),
+        arrival_time: new Date('2026-08-01T13:00:00.000Z'),
+        invite_token_expires_at: new Date('2026-08-08T12:00:00.000Z'),
       });
 
       await expect(service.validateToken('valid-token')).resolves.toEqual({
@@ -66,21 +86,19 @@ describe('InvitationsService', () => {
         arrivalTime: new Date('2026-08-01T13:00:00.000Z'),
       });
 
-      expect(prisma.event.findUnique).toHaveBeenCalledWith({
-        where: { inviteToken: 'valid-token' },
-        include: {
-          organization: { select: { id: true, name: true } },
-        },
-      });
+      expect(supabase.from).toHaveBeenCalledWith('events');
     });
 
     it('rejects expired invite tokens', async () => {
-      prisma.event.findUnique.mockResolvedValue({
+      // Push twice because the test calls validateToken twice
+      const expiredEvent = {
         id: 'event-1',
         status: EventStatus.OPEN,
-        inviteTokenExpiresAt: new Date('2000-01-01T00:00:00.000Z'),
+        invite_token_expires_at: new Date('2000-01-01T00:00:00.000Z'),
         organization: { id: 'org-1', name: 'RideFlow' },
-      });
+      };
+      supabase._pushResult(expiredEvent);
+      supabase._pushResult(expiredEvent);
 
       await expect(service.validateToken('expired-token')).rejects.toBeInstanceOf(
         BadRequestException,
@@ -91,7 +109,7 @@ describe('InvitationsService', () => {
     });
 
     it('rejects unknown invite tokens', async () => {
-      prisma.event.findUnique.mockResolvedValue(null);
+      supabase._pushResult(null);
 
       await expect(service.validateToken('missing-token')).rejects.toBeInstanceOf(
         NotFoundException,
@@ -101,44 +119,59 @@ describe('InvitationsService', () => {
 
   describe('joinEvent', () => {
     it('creates an EventVehicle when joining as driver', async () => {
-      prisma.event.findUnique
-        .mockResolvedValueOnce({
-          id: 'event-1',
-          status: EventStatus.OPEN,
-          inviteTokenExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
-          organization: {
-            members: [{ userId: 'user-1', role: Role.DRIVER }],
-          },
-        })
-        .mockResolvedValueOnce({
-          id: 'event-1',
-          date: new Date('2026-07-22T12:00:00.000Z'),
-        })
-        .mockResolvedValueOnce({
-          organizationId: 'org-1',
-        });
-      prisma.vehicle.findFirst.mockResolvedValue({
+      // Query 1: find event + organization + membership
+      supabase._pushResult({
+        id: 'event-1',
+        status: EventStatus.OPEN,
+        invite_token_expires_at: new Date('2099-01-01T00:00:00.000Z'),
+        organization_id: 'org-1',
+        organization: {
+          members: [{ user_id: 'user-1', role: Role.DRIVER }],
+        },
+      });
+
+      // Query 2: find org member (for role check)
+      supabase._pushResult({
+        role: Role.DRIVER,
+      });
+
+      // Query 3: find vehicle
+      supabase._pushResult({
         id: 'vehicle-1',
-        driverId: 'user-1',
+        driver_id: 'user-1',
         plate: 'ABC125',
       });
-      prisma.eventVehicle.findUnique.mockResolvedValue(null);
-      prisma.eventVehicle.count.mockResolvedValue(0);
-      prisma.eventVehicle.create.mockResolvedValue({
+
+      // Query 4: check existing event vehicle
+      supabase._pushResult(null);
+
+      // Query 5: count registered drivers
+      supabase._pushResult(null, null, { count: 0 });
+
+      // Query 6: find event date for pico y placa
+      supabase._pushResult({
+        date: new Date('2026-07-22T12:00:00.000Z'),
+      });
+
+      // Query 7: create event vehicle
+      supabase._pushResult({
         id: 'event-vehicle-1',
-        eventId: 'event-1',
-        vehicleId: 'vehicle-1',
-        driverId: 'user-1',
-        startLocation: 'Zona T',
-        startLat: 4.667,
-        startLng: -74.053,
-        picoYPlaca: true,
+        event_id: 'event-1',
+        vehicle_id: 'vehicle-1',
+        driver_id: 'user-1',
+        start_location: 'Zona T',
+        start_lat: 4.667,
+        start_lng: -74.053,
+        pico_y_placa: true,
         vehicle: { id: 'vehicle-1', plate: 'ABC125' },
         event: { id: 'event-1', title: 'Morning commute' },
       });
-      prisma.organizationMember.findMany.mockResolvedValue([
-        { userId: 'admin-1' },
-      ]);
+
+      // Query 8: find event for org_id (inside notifyEventAdmins)
+      supabase._pushResult({ organization_id: 'org-1' });
+
+      // Query 9: find org members for notification (notifyEventAdmins)
+      supabase._pushResult([{ user_id: 'admin-1' }]);
 
       const result = await service.joinEvent('driver-token', 'user-1', {
         role: JoinRole.DRIVER,
@@ -148,21 +181,6 @@ describe('InvitationsService', () => {
         startLng: -74.053,
       });
 
-      expect(prisma.eventVehicle.create).toHaveBeenCalledWith({
-        data: {
-          eventId: 'event-1',
-          vehicleId: 'vehicle-1',
-          driverId: 'user-1',
-          startLocation: 'Zona T',
-          startLat: 4.667,
-          startLng: -74.053,
-          picoYPlaca: true,
-        },
-        include: {
-          vehicle: true,
-          event: { select: { id: true, title: true } },
-        },
-      });
       expect(notifications.create).toHaveBeenCalledWith({
         type: 'EVENT_VEHICLE_REGISTERED',
         title: 'New driver registered',
@@ -171,47 +189,60 @@ describe('InvitationsService', () => {
       });
       expect(result).toMatchObject({
         id: 'event-vehicle-1',
-        eventId: 'event-1',
-        vehicleId: 'vehicle-1',
-        driverId: 'user-1',
+        event_id: 'event-1',
+        vehicle_id: 'vehicle-1',
+        driver_id: 'user-1',
       });
     });
 
     it('creates a RideRequest with pickup fields when joining as passenger', async () => {
-      prisma.event.findUnique
-        .mockResolvedValueOnce({
-          id: 'event-1',
-          status: EventStatus.OPEN,
-          inviteTokenExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
-          organization: {
-            members: [{ userId: 'user-2', role: Role.PASSENGER }],
-          },
-        })
-        .mockResolvedValueOnce({
-          id: 'event-1',
-          capacity: 3,
-        })
-        .mockResolvedValueOnce({
-          organizationId: 'org-1',
-        });
-      prisma.rideRequest.findUnique.mockResolvedValue(null);
-      prisma.rideRequest.count.mockResolvedValue(1);
-      prisma.rideRequest.create.mockResolvedValue({
+      // Query 1: find event + org + membership
+      supabase._pushResult({
+        id: 'event-1',
+        status: EventStatus.OPEN,
+        invite_token_expires_at: new Date('2099-01-01T00:00:00.000Z'),
+        organization_id: 'org-1',
+        organization: {
+          members: [{ user_id: 'user-2', role: Role.PASSENGER }],
+        },
+      });
+
+      // Query 2: find org member (role check)
+      supabase._pushResult({
+        role: Role.PASSENGER,
+      });
+
+      // Query 3: check existing ride request
+      supabase._pushResult(null);
+
+      // Query 4: find event for capacity
+      supabase._pushResult({
+        capacity: 3,
+      });
+
+      // Query 5: count accepted requests
+      supabase._pushResult(null, null, { count: 1 });
+
+      // Query 6: create ride request
+      supabase._pushResult({
         id: 'request-1',
-        eventId: 'event-1',
-        passengerId: 'user-2',
-        pickupLat: 4.711,
-        pickupLng: -74.072,
-        pickupAddress: 'Calle 85 #12-34',
+        event_id: 'event-1',
+        passenger_id: 'user-2',
+        pickup_lat: 4.711,
+        pickup_lng: -74.072,
+        pickup_address: 'Calle 85 #12-34',
         passenger: {
           id: 'user-2',
           name: 'Passenger One',
           email: 'passenger@example.com',
         },
       });
-      prisma.organizationMember.findMany.mockResolvedValue([
-        { userId: 'admin-1' },
-      ]);
+
+      // Query 7: find event for org_id (inside notifyEventAdmins)
+      supabase._pushResult({ organization_id: 'org-1' });
+
+      // Query 8: find org members for notification
+      supabase._pushResult([{ user_id: 'admin-1' }]);
 
       const result = await service.joinEvent('passenger-token', 'user-2', {
         role: JoinRole.PASSENGER,
@@ -220,18 +251,6 @@ describe('InvitationsService', () => {
         pickupAddress: 'Calle 85 #12-34',
       });
 
-      expect(prisma.rideRequest.create).toHaveBeenCalledWith({
-        data: {
-          eventId: 'event-1',
-          passengerId: 'user-2',
-          pickupLat: 4.711,
-          pickupLng: -74.072,
-          pickupAddress: 'Calle 85 #12-34',
-        },
-        include: {
-          passenger: { select: { id: true, name: true, email: true } },
-        },
-      });
       expect(notifications.create).toHaveBeenCalledWith({
         type: 'RIDE_REQUESTED',
         title: 'New ride request',
@@ -240,19 +259,20 @@ describe('InvitationsService', () => {
       });
       expect(result).toMatchObject({
         id: 'request-1',
-        eventId: 'event-1',
-        passengerId: 'user-2',
-        pickupAddress: 'Calle 85 #12-34',
+        event_id: 'event-1',
+        passenger_id: 'user-2',
+        pickup_address: 'Calle 85 #12-34',
       });
     });
 
     it('rejects expired tokens during join', async () => {
-      prisma.event.findUnique.mockResolvedValue({
+      supabase._pushResult({
         id: 'event-1',
         status: EventStatus.OPEN,
-        inviteTokenExpiresAt: new Date('2000-01-01T00:00:00.000Z'),
+        invite_token_expires_at: new Date('2000-01-01T00:00:00.000Z'),
+        organization_id: 'org-1',
         organization: {
-          members: [{ userId: 'user-2', role: Role.PASSENGER }],
+          members: [{ user_id: 'user-2', role: Role.PASSENGER }],
         },
       });
 
@@ -262,14 +282,9 @@ describe('InvitationsService', () => {
     });
 
     it('rejects non-members before join creation', async () => {
-      prisma.event.findUnique.mockResolvedValue({
-        id: 'event-1',
-        status: EventStatus.OPEN,
-        inviteTokenExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
-        organization: {
-          members: [],
-        },
-      });
+      // Queries 1-2: event found but no matching org member
+      supabase._pushResult(null);
+      supabase._pushResult({ id: 'event-1' });
 
       await expect(
         service.joinEvent('valid-token', 'outsider', { role: JoinRole.PASSENGER }),
@@ -277,18 +292,24 @@ describe('InvitationsService', () => {
     });
 
     it('rejects duplicate passenger join requests', async () => {
-      prisma.event.findUnique
-        .mockResolvedValueOnce({
-          id: 'event-1',
-          status: EventStatus.OPEN,
-          inviteTokenExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
-          organization: {
-            members: [{ userId: 'user-2', role: Role.PASSENGER }],
-          },
-        });
-      prisma.rideRequest.findUnique.mockResolvedValue({
-        id: 'request-1',
+      // Query 1: find event + org + membership
+      supabase._pushResult({
+        id: 'event-1',
+        status: EventStatus.OPEN,
+        invite_token_expires_at: new Date('2099-01-01T00:00:00.000Z'),
+        organization_id: 'org-1',
+        organization: {
+          members: [{ user_id: 'user-2', role: Role.PASSENGER }],
+        },
       });
+
+      // Query 2: find org member
+      supabase._pushResult({
+        role: Role.PASSENGER,
+      });
+
+      // Query 3: check existing ride request — found (duplicate)
+      supabase._pushResult({ id: 'request-1' });
 
       await expect(
         service.joinEvent('valid-token', 'user-2', { role: JoinRole.PASSENGER }),

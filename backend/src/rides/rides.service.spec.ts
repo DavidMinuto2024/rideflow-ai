@@ -1,24 +1,47 @@
 import { RequestStatus, Role } from '@prisma/client';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { RidesService } from './rides.service';
 
+function createMockSupabase() {
+  const resultQueue: Array<Record<string, unknown>> = [];
+
+  const builder: Record<string, jest.Mock> = {};
+  const chainMethods = [
+    'select', 'insert', 'update', 'delete', 'eq', 'neq',
+    'in', 'gte', 'lte', 'order', 'limit', 'single',
+    'maybeSingle',
+  ];
+  for (const m of chainMethods) {
+    builder[m] = jest.fn().mockReturnThis();
+  }
+
+  // Make the builder thenable — pops next result from the queue
+  (builder as any).then = (onResolve: (v: unknown) => unknown) => {
+    const r = resultQueue.shift() || { data: null, error: null };
+    return Promise.resolve(r).then(onResolve);
+  };
+
+  // Expose a not() mock — it returns the builder
+  (builder as any).not = jest.fn().mockReturnValue(builder);
+
+  const from = jest.fn(() => builder);
+
+  return {
+    from,
+    _pushResult: (data: unknown, error: unknown = null, extra: Record<string, unknown> = {}) => {
+      resultQueue.push({ data, error, ...extra });
+    },
+  };
+}
+
 describe('RidesService', () => {
-  let prisma: any;
+  let supabase: ReturnType<typeof createMockSupabase>;
   let notifications: { create: jest.Mock };
   let suggestionsService: { optimizeTimes: jest.Mock };
   let service: RidesService;
 
   beforeEach(() => {
-    prisma = {
-      rideRequest: {
-        findUnique: jest.fn(),
-        count: jest.fn(),
-        update: jest.fn(),
-      },
-      organizationMember: {
-        findUnique: jest.fn(),
-        findMany: jest.fn(),
-      },
-    };
+    supabase = createMockSupabase();
 
     notifications = {
       create: jest.fn().mockResolvedValue(undefined),
@@ -29,7 +52,7 @@ describe('RidesService', () => {
     };
 
     service = new RidesService(
-      prisma,
+      supabase as unknown as SupabaseDataService,
       notifications as any,
       suggestionsService as any,
     );
@@ -37,31 +60,36 @@ describe('RidesService', () => {
 
   describe('updateRequestStatus', () => {
     it('reoptimizes times and notifies affected passengers when cancelling an accepted request', async () => {
-      prisma.rideRequest.findUnique.mockResolvedValue({
+      // Query 1: find ride request
+      supabase._pushResult({
         id: 'request-1',
-        eventId: 'event-1',
-        passengerId: 'passenger-1',
-        tripId: 'trip-1',
+        event_id: 'event-1',
+        passenger_id: 'passenger-1',
+        trip_id: 'trip-1',
         status: RequestStatus.ACCEPTED,
         event: {
           title: 'Morning commute',
-          organizationId: 'org-1',
+          organization_id: 'org-1',
           capacity: 4,
           organization: {},
         },
         passenger: { id: 'passenger-1', name: 'Passenger One' },
       });
-      prisma.organizationMember.findUnique.mockResolvedValue({
-        userId: 'driver-1',
+
+      // Query 2: find authorizer
+      supabase._pushResult({
         role: Role.DRIVER,
       });
-      prisma.rideRequest.update.mockResolvedValue({
+
+      // Query 3: update ride request
+      supabase._pushResult({
         id: 'request-1',
-        eventId: 'event-1',
-        passengerId: 'passenger-1',
+        event_id: 'event-1',
+        passenger_id: 'passenger-1',
         status: RequestStatus.CANCELLED,
-        passenger: { id: 'passenger-1', name: 'Passenger One' },
+        passenger: { id: 'passenger-1', name: 'Passenger One', email: 'p1@example.com' },
       });
+
       suggestionsService.optimizeTimes.mockResolvedValue({
         message: 'Optimized times for 1 trip(s)',
         arrivalTime: '2026-08-01T09:00:00.000Z',
@@ -92,13 +120,8 @@ describe('RidesService', () => {
         'driver-1',
       );
 
-      expect(prisma.rideRequest.update).toHaveBeenCalledWith({
-        where: { id: 'request-1' },
-        data: { status: RequestStatus.CANCELLED },
-        include: {
-          passenger: { select: { id: true, name: true, email: true } },
-        },
-      });
+      expect(supabase.from).toHaveBeenCalledWith('ride_requests');
+      expect(supabase.from).toHaveBeenCalledWith('organization_members');
       expect(suggestionsService.optimizeTimes).toHaveBeenCalledWith('event-1');
       expect(notifications.create).toHaveBeenNthCalledWith(1, {
         type: 'RIDE_CANCELLED',
@@ -125,29 +148,34 @@ describe('RidesService', () => {
     });
 
     it('keeps cancellation successful when reoptimization fails', async () => {
-      prisma.rideRequest.findUnique.mockResolvedValue({
+      // Query 1: find ride request
+      supabase._pushResult({
         id: 'request-2',
-        eventId: 'event-2',
-        passengerId: 'passenger-9',
-        tripId: 'trip-9',
+        event_id: 'event-2',
+        passenger_id: 'passenger-9',
+        trip_id: 'trip-9',
         status: RequestStatus.ACCEPTED,
         event: {
           title: 'Evening return',
-          organizationId: 'org-1',
+          organization_id: 'org-1',
           capacity: 4,
           organization: {},
         },
         passenger: { id: 'passenger-9', name: 'Passenger Nine' },
       });
-      prisma.organizationMember.findUnique.mockResolvedValue({
-        userId: 'admin-1',
+
+      // Query 2: find authorizer
+      supabase._pushResult({
         role: Role.ORG_ADMIN,
       });
-      prisma.rideRequest.update.mockResolvedValue({
+
+      // Query 3: update ride request
+      supabase._pushResult({
         id: 'request-2',
         status: RequestStatus.CANCELLED,
-        passenger: { id: 'passenger-9', name: 'Passenger Nine' },
+        passenger: { id: 'passenger-9', name: 'Passenger Nine', email: 'p9@example.com' },
       });
+
       suggestionsService.optimizeTimes.mockRejectedValue(new Error('OSRM unavailable'));
 
       await expect(

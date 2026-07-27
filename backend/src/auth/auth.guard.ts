@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { SupabaseAuthService } from './supabase-auth.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 /**
  * JWT Auth guard — validates Supabase-issued JWTs by calling
@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly supabaseAuth: SupabaseAuthService,
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -42,10 +42,13 @@ export class AuthGuard implements CanActivate {
     }
 
     // Look up the user in our local database
-    const user = await this.prisma.user.findUnique({
-      where: { email: supabaseUser.email },
-    });
+    const { data: user, error } = await this.supabase
+      .from('users')
+      .select('*')
+      .eq('email', supabaseUser.email)
+      .maybeSingle();
 
+    if (error) this.supabase.handleError(error, 'users');
     if (!user) {
       throw new UnauthorizedException('User not found in platform');
     }

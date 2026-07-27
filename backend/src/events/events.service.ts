@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { EventStatus } from '@prisma/client';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -28,7 +28,7 @@ const VALID_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly supabase: SupabaseDataService) {}
 
   async create(organizationId: string, dto: CreateEventDto) {
     // Validate required fields
@@ -57,24 +57,28 @@ export class EventsService {
       // QR generation is non-critical — event can still be created
     }
 
-    const event = await this.prisma.event.create({
-      data: {
+    const { data: event, error } = await this.supabase
+      .from('events')
+      .insert({
         title: dto.title,
         description: dto.description,
         date: new Date(dto.date),
         origin: dto.origin,
-        originLat: dto.originLat,
-        originLng: dto.originLng,
+        origin_lat: dto.originLat,
+        origin_lng: dto.originLng,
         destination: dto.destination,
-        destLat: dto.destLat,
-        destLng: dto.destLng,
+        dest_lat: dto.destLat,
+        dest_lng: dto.destLng,
         capacity: dto.capacity ?? 4,
-        organizationId,
-        inviteToken,
-        inviteTokenExpiresAt,
-        arrivalTime: dto.arrivalTime ? new Date(dto.arrivalTime) : null,
-      },
-    });
+        organization_id: organizationId,
+        invite_token: inviteToken,
+        invite_token_expires_at: inviteTokenExpiresAt,
+        arrival_time: dto.arrivalTime ? new Date(dto.arrivalTime) : null,
+      })
+      .select()
+      .single();
+
+    if (error) this.supabase.handleError(error, 'events');
 
     return {
       ...event,
@@ -83,26 +87,29 @@ export class EventsService {
   }
 
   async findByOrganization(organizationId: string) {
-    return this.prisma.event.findMany({
-      where: { organizationId },
-      orderBy: { date: 'asc' },
-    });
+    const { data, error } = await this.supabase
+      .from('events')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .order('date', { ascending: true });
+
+    if (error) this.supabase.handleError(error, 'events');
+    return data || [];
   }
 
   async findOne(id: string) {
-    const event = await this.prisma.event.findUnique({
-      where: { id },
-      include: {
-        trips: {
-          include: {
-            driver: true,
-            vehicle: true,
-            rideRequests: true,
-            passengerAssignments: { include: { user: true } },
-          },
-        },
-      },
-    });
+    const { data: event, error } = await this.supabase
+      .from('events')
+      .select('*, trips:trips(*, driver:users(*), vehicle:vehicles(*), ride_requests:ride_requests(*), passenger_assignments:passenger_assignments(*, user:users(*)))')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new NotFoundException(`Event ${id} not found`);
+      }
+      this.supabase.handleError(error, 'events');
+    }
 
     if (!event) {
       throw new NotFoundException(`Event ${id} not found`);
@@ -112,7 +119,13 @@ export class EventsService {
   }
 
   async update(id: string, dto: UpdateEventDto) {
-    const event = await this.prisma.event.findUnique({ where: { id } });
+    const { data: event, error: findError } = await this.supabase
+      .from('events')
+      .select('status')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${id} not found`);
     }
@@ -124,23 +137,46 @@ export class EventsService {
       );
     }
 
-    return this.prisma.event.update({
-      where: { id },
-      data: {
-        ...dto,
-        ...(dto.date ? { date: new Date(dto.date) } : {}),
-      },
-    });
+    // Build update data with snake_case column mapping
+    const updateData: Record<string, unknown> = {};
+    if (dto.title !== undefined) updateData['title'] = dto.title;
+    if (dto.description !== undefined) updateData['description'] = dto.description;
+    if (dto.date !== undefined) updateData['date'] = new Date(dto.date);
+    if (dto.origin !== undefined) updateData['origin'] = dto.origin;
+    if (dto.originLat !== undefined) updateData['origin_lat'] = dto.originLat;
+    if (dto.originLng !== undefined) updateData['origin_lng'] = dto.originLng;
+    if (dto.destination !== undefined) updateData['destination'] = dto.destination;
+    if (dto.destLat !== undefined) updateData['dest_lat'] = dto.destLat;
+    if (dto.destLng !== undefined) updateData['dest_lng'] = dto.destLng;
+    if (dto.capacity !== undefined) updateData['capacity'] = dto.capacity;
+    if (dto.arrivalTime !== undefined) updateData['arrival_time'] = dto.arrivalTime ? new Date(dto.arrivalTime) : null;
+
+    const { data: updated, error: updateError } = await this.supabase
+      .from('events')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'events');
+    return updated;
   }
 
   async updateStatus(id: string, dto: UpdateEventStatusDto) {
-    const event = await this.prisma.event.findUnique({ where: { id } });
+    const { data: event, error: findError } = await this.supabase
+      .from('events')
+      .select('id, status, date, organization_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${id} not found`);
     }
 
     // Validate state transition
-    const allowed = VALID_TRANSITIONS[event.status];
+    const currentStatus = event.status as EventStatus;
+    const allowed = VALID_TRANSITIONS[currentStatus];
     if (!allowed || !allowed.includes(dto.status)) {
       throw new BadRequestException(
         `Invalid state transition: ${event.status} → ${dto.status}. ` +
@@ -150,7 +186,11 @@ export class EventsService {
 
     // Check for overlapping events when transitioning to OPEN
     if (dto.status === EventStatus.OPEN) {
-      const overlapping = await this.checkOverlapping(event);
+      const overlapping = await this.checkOverlapping({
+        id: event.id,
+        date: new Date(event.date),
+        organizationId: event.organization_id,
+      });
       if (overlapping) {
         throw new ConflictException(
           'An overlapping event already exists for this time slot',
@@ -158,14 +198,25 @@ export class EventsService {
       }
     }
 
-    return this.prisma.event.update({
-      where: { id },
-      data: { status: dto.status },
-    });
+    const { data: updated, error: updateError } = await this.supabase
+      .from('events')
+      .update({ status: dto.status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) this.supabase.handleError(updateError, 'events');
+    return updated;
   }
 
   async remove(id: string) {
-    const event = await this.prisma.event.findUnique({ where: { id } });
+    const { data: event, error: findError } = await this.supabase
+      .from('events')
+      .select('status')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'events');
     if (!event) {
       throw new NotFoundException(`Event ${id} not found`);
     }
@@ -177,7 +228,12 @@ export class EventsService {
       );
     }
 
-    await this.prisma.event.delete({ where: { id } });
+    const { error: deleteError } = await this.supabase
+      .from('events')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) this.supabase.handleError(deleteError, 'events');
     return { deleted: true };
   }
 
@@ -205,20 +261,16 @@ export class EventsService {
     const endOfDay = new Date(event.date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const sameDayEvents = await this.prisma.event.findMany({
-      where: {
-        organizationId: event.organizationId,
-        id: { not: event.id },
-        date: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-        status: {
-          in: [EventStatus.OPEN, EventStatus.PUBLISHED, EventStatus.CLOSED],
-        },
-      },
-    });
+    const { data: sameDayEvents, error } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('organization_id', event.organizationId)
+      .neq('id', event.id)
+      .gte('date', startOfDay.toISOString())
+      .lte('date', endOfDay.toISOString())
+      .in('status', [EventStatus.OPEN, EventStatus.PUBLISHED, EventStatus.CLOSED]);
 
-    return sameDayEvents.length > 0;
+    if (error) this.supabase.handleError(error, 'events');
+    return (sameDayEvents?.length ?? 0) > 0;
   }
 }

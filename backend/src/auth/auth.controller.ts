@@ -3,7 +3,6 @@ import {
   Post,
   Get,
   Body,
-  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -11,7 +10,7 @@ import {
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthGuard } from './auth.guard';
 import { SupabaseAuthService } from './supabase-auth.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -21,7 +20,7 @@ import { User } from '@prisma/client';
 export class AuthController {
   constructor(
     private readonly supabaseAuth: SupabaseAuthService,
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
   ) {}
 
   @Post('signup')
@@ -31,15 +30,42 @@ export class AuthController {
 
     // Create or update the local user record
     const supabaseUserId = result.user?.id ?? 'unknown';
-    const user = await this.prisma.user.upsert({
-      where: { email: dto.email },
-      update: { name: dto.name },
-      create: {
-        email: dto.email,
-        name: dto.name,
-        id: supabaseUserId,
-      },
-    });
+
+    // Check if user exists first
+    const { data: existingUser } = await this.supabase
+      .from('users')
+      .select('*')
+      .eq('email', dto.email)
+      .maybeSingle();
+
+    let user: Record<string, unknown> | null;
+
+    if (existingUser) {
+      // Update
+      const { data: updatedUser, error: updateError } = await this.supabase
+        .from('users')
+        .update({ name: dto.name })
+        .eq('email', dto.email)
+        .select()
+        .single();
+
+      if (updateError) this.supabase.handleError(updateError, 'users');
+      user = updatedUser;
+    } else {
+      // Create
+      const { data: newUser, error: createError } = await this.supabase
+        .from('users')
+        .insert({
+          email: dto.email,
+          name: dto.name,
+          id: supabaseUserId,
+        })
+        .select()
+        .single();
+
+      if (createError) this.supabase.handleError(createError, 'users');
+      user = newUser;
+    }
 
     return {
       user,
@@ -56,15 +82,33 @@ export class AuthController {
 
     // Ensure local user record exists
     const supabaseUserId = result.user?.id ?? 'unknown';
-    const user = await this.prisma.user.upsert({
-      where: { email: dto.email },
-      update: {},
-      create: {
-        email: dto.email,
-        name: dto.email.split('@')[0],
-        id: supabaseUserId,
-      },
-    });
+
+    // Check if user exists first
+    const { data: existingUser } = await this.supabase
+      .from('users')
+      .select('*')
+      .eq('email', dto.email)
+      .maybeSingle();
+
+    let user: Record<string, unknown> | null;
+
+    if (existingUser) {
+      user = existingUser;
+    } else {
+      // Create
+      const { data: newUser, error: createError } = await this.supabase
+        .from('users')
+        .insert({
+          email: dto.email,
+          name: dto.email.split('@')[0],
+          id: supabaseUserId,
+        })
+        .select()
+        .single();
+
+      if (createError) this.supabase.handleError(createError, 'users');
+      user = newUser;
+    }
 
     return {
       user,
@@ -77,10 +121,12 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async session(@CurrentUser() user: User) {
     // Load memberships to return role context
-    const memberships = await this.prisma.organizationMember.findMany({
-      where: { userId: user.id },
-      include: { organization: true },
-    });
+    const { data: memberships, error: membershipsError } = await this.supabase
+      .from('organization_members')
+      .select('*, organization:organizations(*)')
+      .eq('user_id', user.id);
+
+    if (membershipsError) this.supabase.handleError(membershipsError, 'organization_members');
 
     return { user, memberships };
   }

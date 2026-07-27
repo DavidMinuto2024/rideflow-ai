@@ -5,7 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventStatus, Role } from '@prisma/client';
 import { JoinEventDto, JoinRole } from './dto/join-event.dto';
@@ -13,7 +13,7 @@ import { JoinEventDto, JoinRole } from './dto/join-event.dto';
 @Injectable()
 export class InvitationsService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -22,20 +22,20 @@ export class InvitationsService {
    * Throws if token is invalid, expired, or event is not open for joining.
    */
   async validateToken(token: string) {
-    const event = await this.prisma.event.findUnique({
-      where: { inviteToken: token },
-      include: {
-        organization: { select: { id: true, name: true } },
-      },
-    });
+    const { data: event, error } = await this.supabase
+      .from('events')
+      .select('*, organization:organizations!inner(id, name)')
+      .eq('invite_token', token)
+      .maybeSingle();
 
+    if (error) this.supabase.handleError(error, 'events');
     if (!event) {
       throw new NotFoundException('Invalid invite token');
     }
 
     if (
-      event.inviteTokenExpiresAt &&
-      new Date() > event.inviteTokenExpiresAt
+      event.invite_token_expires_at &&
+      new Date() > new Date(event.invite_token_expires_at)
     ) {
       throw new BadRequestException('Invite token has expired');
     }
@@ -54,7 +54,7 @@ export class InvitationsService {
       organization: event.organization,
       status: event.status,
       capacity: event.capacity,
-      arrivalTime: event.arrivalTime,
+      arrivalTime: event.arrival_time,
     };
   }
 
@@ -64,26 +64,31 @@ export class InvitationsService {
    * Passengers: creates a RideRequest record.
    */
   async joinEvent(token: string, userId: string, dto: JoinEventDto) {
-    const event = await this.prisma.event.findUnique({
-      where: { inviteToken: token },
-      include: {
-        organization: {
-          include: {
-            members: {
-              where: { userId },
-            },
-          },
-        },
-      },
-    });
+    const { data: event, error } = await this.supabase
+      .from('events')
+      .select('*, organization:organizations!inner(*, members:organization_members!inner(*))')
+      .eq('invite_token', token)
+      .eq('organization.members.user_id', userId)
+      .maybeSingle();
 
+    if (error) this.supabase.handleError(error, 'events');
     if (!event) {
-      throw new NotFoundException('Invalid invite token');
+      // Check if the issue is a bad token vs. non-membership
+      const { data: tokenCheck } = await this.supabase
+        .from('events')
+        .select('id')
+        .eq('invite_token', token)
+        .maybeSingle();
+
+      if (!tokenCheck) {
+        throw new NotFoundException('Invalid invite token');
+      }
+      throw new ForbiddenException('You are not a member of this organization');
     }
 
     if (
-      event.inviteTokenExpiresAt &&
-      new Date() > event.inviteTokenExpiresAt
+      event.invite_token_expires_at &&
+      new Date() > new Date(event.invite_token_expires_at)
     ) {
       throw new BadRequestException('Invite token has expired');
     }
@@ -92,12 +97,17 @@ export class InvitationsService {
       throw new BadRequestException('This event is not open for joining');
     }
 
-    // Ensure user is a member of the organization
-    if (!event.organization.members || event.organization.members.length === 0) {
+    // Get user's role in the org
+    const { data: member } = await this.supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', event.organization_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!member) {
       throw new ForbiddenException('You are not a member of this organization');
     }
-
-    const member = event.organization.members[0];
 
     if (dto.role === JoinRole.DRIVER) {
       return this.joinAsDriver(event.id, userId, member.role, dto);
@@ -118,57 +128,72 @@ export class InvitationsService {
     }
 
     // Verify the vehicle exists and belongs to this user
-    const vehicle = await this.prisma.vehicle.findFirst({
-      where: { id: dto.vehicleId, driverId: userId },
-    });
+    const { data: vehicle, error: vehicleError } = await this.supabase
+      .from('vehicles')
+      .select('*')
+      .eq('id', dto.vehicleId)
+      .eq('driver_id', userId)
+      .maybeSingle();
 
+    if (vehicleError) this.supabase.handleError(vehicleError, 'vehicles');
     if (!vehicle) {
       throw new BadRequestException('Vehicle not found or not assigned to you');
     }
 
     // Check if already registered for this event
-    const existing = await this.prisma.eventVehicle.findUnique({
-      where: { eventId_vehicleId: { eventId, vehicleId: dto.vehicleId } },
-    });
+    const { data: existing, error: existingError } = await this.supabase
+      .from('event_vehicles')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('vehicle_id', dto.vehicleId)
+      .maybeSingle();
 
+    if (existingError) this.supabase.handleError(existingError, 'event_vehicles');
     if (existing) {
       throw new ConflictException('This vehicle is already registered for this event');
     }
 
-    // Check the event's driver capacity (rough check: at least 1 spot available)
-    const registeredDrivers = await this.prisma.eventVehicle.count({
-      where: { eventId },
-    });
+    // Check the event's driver capacity
+    const { count: registeredDrivers, error: countError } = await this.supabase
+      .from('event_vehicles')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId);
 
-    // We use capacity as a rough proxy — actual limit is tracked per trip
-    // Allow generous driver registration (up to event capacity is fine)
-    if (registeredDrivers >= 20) {
+    if (countError) this.supabase.handleError(countError, 'event_vehicles');
+
+    if ((registeredDrivers ?? 0) >= 20) {
       throw new ConflictException('Event has reached maximum driver capacity');
     }
 
     // Compute pico y placa for the event date
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('date')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     const picoYPlaca = this.checkPicoYPlaca(
       vehicle.plate,
-      event?.date ?? new Date(),
+      event?.date ? new Date(event.date) : new Date(),
     );
 
     // Create EventVehicle
-    const eventVehicle = await this.prisma.eventVehicle.create({
-      data: {
-        eventId,
-        vehicleId: dto.vehicleId,
-        driverId: userId,
-        startLocation: dto.startLocation,
-        startLat: dto.startLat,
-        startLng: dto.startLng,
-        picoYPlaca,
-      },
-      include: {
-        vehicle: true,
-        event: { select: { id: true, title: true } },
-      },
-    });
+    const { data: eventVehicle, error: createError } = await this.supabase
+      .from('event_vehicles')
+      .insert({
+        event_id: eventId,
+        vehicle_id: dto.vehicleId,
+        driver_id: userId,
+        start_location: dto.startLocation,
+        start_lat: dto.startLat,
+        start_lng: dto.startLng,
+        pico_y_placa: picoYPlaca,
+      })
+      .select('*, vehicle:vehicles(*), event:events!inner(id, title)')
+      .single();
+
+    if (createError) this.supabase.handleError(createError, 'event_vehicles');
 
     // Notify admins
     await this.notifyEventAdmins(eventId, 'EVENT_VEHICLE_REGISTERED', {
@@ -186,41 +211,56 @@ export class InvitationsService {
     dto: JoinEventDto,
   ) {
     // Check existing request
-    const existing = await this.prisma.rideRequest.findUnique({
-      where: { eventId_passengerId: { eventId, passengerId: userId } },
-    });
+    const { data: existing, error: existingError } = await this.supabase
+      .from('ride_requests')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('passenger_id', userId)
+      .maybeSingle();
 
+    if (existingError) this.supabase.handleError(existingError, 'ride_requests');
     if (existing) {
       throw new ConflictException('You already have a request for this event');
     }
 
     // Check event capacity
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('capacity')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) {
       throw new NotFoundException('Event not found');
     }
 
-    const acceptedCount = await this.prisma.rideRequest.count({
-      where: { eventId, status: 'ACCEPTED' as any },
-    });
+    const { count: acceptedCount, error: countError } = await this.supabase
+      .from('ride_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('status', 'ACCEPTED');
 
-    if (acceptedCount >= event.capacity) {
+    if (countError) this.supabase.handleError(countError, 'ride_requests');
+
+    if ((acceptedCount ?? 0) >= event.capacity) {
       throw new ConflictException('Event has reached full capacity');
     }
 
     // If pickup location is provided, it will be stored on the RideRequest
-    const rideRequest = await this.prisma.rideRequest.create({
-      data: {
-        eventId,
-        passengerId: userId,
-        pickupLat: dto.pickupLat ?? null,
-        pickupLng: dto.pickupLng ?? null,
-        pickupAddress: dto.pickupAddress ?? null,
-      },
-      include: {
-        passenger: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const { data: rideRequest, error: createError } = await this.supabase
+      .from('ride_requests')
+      .insert({
+        event_id: eventId,
+        passenger_id: userId,
+        pickup_lat: dto.pickupLat ?? null,
+        pickup_lng: dto.pickupLng ?? null,
+        pickup_address: dto.pickupAddress ?? null,
+      })
+      .select('*, passenger:users!inner(id, name, email)')
+      .single();
+
+    if (createError) this.supabase.handleError(createError, 'ride_requests');
 
     // Notify admins
     await this.notifyEventAdmins(eventId, 'RIDE_REQUESTED', {
@@ -262,25 +302,31 @@ export class InvitationsService {
     type: string,
     data: { title: string; message: string; eventId: string },
   ) {
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-      select: { organizationId: true },
-    });
+    const { data: event, error: eventError } = await this.supabase
+      .from('events')
+      .select('organization_id')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (eventError) this.supabase.handleError(eventError, 'events');
     if (!event) return;
 
-    const admins = await this.prisma.organizationMember.findMany({
-      where: {
-        organizationId: event.organizationId,
-        role: { in: [Role.ORG_ADMIN, Role.SUPER_ADMIN] },
-      },
-    });
+    const { data: admins, error: adminsError } = await this.supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', event.organization_id)
+      .in('role', [Role.ORG_ADMIN, Role.SUPER_ADMIN]);
+
+    if (adminsError) this.supabase.handleError(adminsError, 'organization_members');
+
+    if (!admins) return;
 
     for (const admin of admins) {
       await this.notifications.create({
         type,
         title: data.title,
         message: data.message,
-        userId: admin.userId,
+        userId: admin.user_id,
       });
     }
   }

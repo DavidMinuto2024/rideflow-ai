@@ -3,7 +3,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 interface OSRMWaypoint {
   location: [number, number]; // [lng, lat]
@@ -35,7 +35,7 @@ export class RoutesService {
   private readonly osrmBaseUrl: string;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly supabase: SupabaseDataService,
     private readonly config: ConfigService,
   ) {
     this.osrmBaseUrl = this.config.get<string>('OSRM_BASE_URL', '');
@@ -46,16 +46,14 @@ export class RoutesService {
     tripId: string,
     extraWaypoints: Array<{ lat: number; lng: number }> = [],
   ) {
-    const trip = await this.prisma.trip.findFirst({
-      where: { id: tripId, eventId },
-      include: {
-        event: true,
-        passengerAssignments: {
-          include: { user: true },
-        },
-      },
-    });
+    const { data: trip, error: tripError } = await this.supabase
+      .from('trips')
+      .select('*, event:events(*), passenger_assignments:passenger_assignments(*, user:users(*))')
+      .eq('id', tripId)
+      .eq('event_id', eventId)
+      .maybeSingle();
 
+    if (tripError) this.supabase.handleError(tripError, 'trips');
     if (!trip) {
       throw new NotFoundException(`Trip ${tripId} not found in event ${eventId}`);
     }
@@ -111,14 +109,16 @@ export class RoutesService {
         const route = result.routes[0];
 
         // Store route data in trip
-        await this.prisma.trip.update({
-          where: { id: tripId },
-          data: {
+        const { error: updateError } = await this.supabase
+          .from('trips')
+          .update({
             distance: route.distance,
             duration: route.duration,
-            routeGeometry: route.geometry,
-          },
-        });
+            route_geometry: route.geometry,
+          })
+          .eq('id', tripId);
+
+        if (updateError) this.supabase.handleError(updateError, 'trips');
 
         return {
           source: 'osrm',
@@ -187,14 +187,16 @@ export class RoutesService {
     }
 
     // Store fallback data
-    await this.prisma.trip.update({
-      where: { id: trip.id },
-      data: {
+    const { error: updateError } = await this.supabase
+      .from('trips')
+      .update({
         distance: Math.round(distance),
         duration: Math.round(duration),
-        routeGeometry: null,
-      },
-    });
+        route_geometry: null,
+      })
+      .eq('id', trip.id);
+
+    if (updateError) this.supabase.handleError(updateError, 'trips');
 
     return {
       source: 'fallback',
