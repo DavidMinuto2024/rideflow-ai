@@ -1,4 +1,5 @@
 // Vitest setup — provides jsdom polyfills and global mocks
+import '@testing-library/jest-dom/vitest';
 
 // JSDOM does not implement matchMedia; provide a default stub.
 Object.defineProperty(window, 'matchMedia', {

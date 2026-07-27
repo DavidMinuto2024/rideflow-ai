@@ -128,25 +128,33 @@ export class RidesService {
       throw new NotFoundException(`Ride request ${id} not found`);
     }
 
-    // Verify authorizer is driver or admin for this event's org
-    const { data: authorizer, error: authError } = await this.supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', request.event.organization_id)
-      .eq('user_id', userId)
-      .maybeSingle();
+    // Passenger can cancel own PENDING request without role check
+    const isPassengerCancellingOwn =
+      request.passenger_id === userId &&
+      dto.status === RequestStatus.CANCELLED &&
+      request.status === RequestStatus.PENDING;
 
-    if (authError) this.supabase.handleError(authError, 'organization_members');
+    if (!isPassengerCancellingOwn) {
+      // Verify authorizer is driver or admin for this event's org
+      const { data: authorizer, error: authError } = await this.supabase
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', request.event.organization_id)
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    if (
-      !authorizer ||
-      (authorizer.role !== Role.ORG_ADMIN &&
-        authorizer.role !== Role.DRIVER &&
-        authorizer.role !== Role.SUPER_ADMIN)
-    ) {
-      throw new ForbiddenException(
-        'Only event drivers or admins can approve/reject ride requests',
-      );
+      if (authError) this.supabase.handleError(authError, 'organization_members');
+
+      if (
+        !authorizer ||
+        (authorizer.role !== Role.ORG_ADMIN &&
+          authorizer.role !== Role.DRIVER &&
+          authorizer.role !== Role.SUPER_ADMIN)
+      ) {
+        throw new ForbiddenException(
+          'Only event drivers or admins can approve/reject ride requests',
+        );
+      }
     }
 
     // Validate transition

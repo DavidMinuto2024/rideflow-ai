@@ -24,7 +24,7 @@ export default function NewEventPage() {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [origin, setOrigin] = useState('');
+  const [arrivalTime, setArrivalTime] = useState('');
   const [destination, setDestination] = useState('');
   const [capacity, setCapacity] = useState(4);
   const [description, setDescription] = useState('');
@@ -46,10 +46,11 @@ export default function NewEventPage() {
       await createEvent.mutateAsync({
         title,
         date: eventDate,
-        origin,
+        origin: '',
         destination,
         capacity,
         description: description || undefined,
+        arrivalTime: new Date(arrivalTime).toISOString(),
       });
       router.push('/events');
     } catch (err) {
@@ -125,14 +126,13 @@ export default function NewEventPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Origen" id="origin">
+              <FormField label="Hora de llegada" id="arrivalTime" required>
                 <Input
-                  id="origin"
-                  type="text"
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
+                  id="arrivalTime"
+                  type="datetime-local"
+                  value={arrivalTime}
+                  onChange={(e) => setArrivalTime(e.target.value)}
                   required
-                  placeholder="Dirección de salida"
                 />
               </FormField>
               <FormField label="Destino" id="destination">

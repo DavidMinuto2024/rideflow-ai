@@ -59,6 +59,80 @@ describe('RidesService', () => {
   });
 
   describe('updateRequestStatus', () => {
+    it('allows a passenger to cancel their own PENDING request (bypasses role check)', async () => {
+      // Query 1: find ride request — PENDING, owned by passenger-1
+      supabase._pushResult({
+        id: 'request-3',
+        event_id: 'event-3',
+        passenger_id: 'passenger-1',
+        trip_id: null,
+        status: RequestStatus.PENDING,
+        event: {
+          title: 'Morning commute',
+          organization_id: 'org-1',
+          capacity: 4,
+          organization: {},
+        },
+        passenger: { id: 'passenger-1', name: 'Passenger One' },
+      });
+
+      // Query 2: update ride request (no role check queried)
+      supabase._pushResult({
+        id: 'request-3',
+        event_id: 'event-3',
+        passenger_id: 'passenger-1',
+        status: RequestStatus.CANCELLED,
+        passenger: { id: 'passenger-1', name: 'Passenger One', email: 'p1@example.com' },
+      });
+
+      suggestionsService.optimizeTimes.mockResolvedValue({ message: 'No trips to optimize' });
+
+      const result = await service.updateRequestStatus(
+        'request-3',
+        { status: RequestStatus.CANCELLED },
+        'passenger-1',
+      );
+
+      expect(result).toMatchObject({
+        id: 'request-3',
+        status: RequestStatus.CANCELLED,
+      });
+      // Should NOT query organization_members (role check bypassed)
+      const orgMemberCalls = (supabase.from as jest.Mock).mock.calls.filter(
+        (call: unknown[]) => call[0] === 'organization_members',
+      );
+      expect(orgMemberCalls).toHaveLength(0);
+    });
+
+    it('enforces role check for a non-passenger cancelling a PENDING request', async () => {
+      // Query 1: find ride request
+      supabase._pushResult({
+        id: 'request-4',
+        event_id: 'event-3',
+        passenger_id: 'passenger-2',
+        trip_id: null,
+        status: RequestStatus.PENDING,
+        event: {
+          title: 'Morning commute',
+          organization_id: 'org-1',
+          capacity: 4,
+          organization: {},
+        },
+        passenger: { id: 'passenger-2', name: 'Passenger Two' },
+      });
+
+      // Query 2: find authorizer — no membership for user-99
+      supabase._pushResult(null);
+
+      await expect(
+        service.updateRequestStatus(
+          'request-4',
+          { status: RequestStatus.CANCELLED },
+          'user-99',
+        ),
+      ).rejects.toThrow('Only event drivers or admins can approve/reject ride requests');
+    });
+
     it('reoptimizes times and notifies affected passengers when cancelling an accepted request', async () => {
       // Query 1: find ride request
       supabase._pushResult({

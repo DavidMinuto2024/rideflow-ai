@@ -1,20 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, XCircle, Sparkles, ClipboardList } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Sparkles, ClipboardList, Ban, UserPlus } from 'lucide-react';
 import { useEvent } from '@/lib/queries/events';
 import { useSession } from '@/lib/queries/auth';
 import {
   useEventRequests,
   useUpdateRequestStatus,
+  useCancelRequest,
+  useDirectAssign,
   useAutoAssign,
 } from '@/lib/queries/rides';
+import { apiClient } from '@/lib/api';
 import { PageContainer } from '@/components/PageContainer';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'ORG_ADMIN', 'DRIVER'];
@@ -43,13 +47,61 @@ export default function EventRequestsPage() {
   const { data: session } = useSession();
   const { data: requests, isLoading, refetch } = useEventRequests(eventId);
   const updateStatus = useUpdateRequestStatus();
+  const cancelRequest = useCancelRequest();
   const autoAssign = useAutoAssign(eventId);
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [cancelModal, setCancelModal] = useState<string | null>(null);
+  const [assignModal, setAssignModal] = useState<{ requestId: string; passengerId: string } | null>(null);
+  const [drivers, setDrivers] = useState<{ id: string; name: string; vehicle: string }[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState('');
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const directAssign = useDirectAssign(eventId);
 
   const canManage = session?.memberships?.some((m) => {
     if (!event) return false;
     return m.organization.id === event.organizationId && ALLOWED_ROLES.includes(m.role);
   });
+
+  const currentUserId = session?.user?.id;
+
+  const isOwnPending = (req: { passengerId: string; status: string }) =>
+    req.passengerId === currentUserId && req.status === 'PENDING';
+
+  // Fetch drivers when assign modal opens
+  useEffect(() => {
+    if (assignModal) {
+      setLoadingDrivers(true);
+      setSelectedDriver('');
+      apiClient
+        .get<{ id: string; driver: { id: string; name: string }; vehicle: { model: string; plate: string } }[]>(
+          `/events/${eventId}/vehicles`,
+        )
+        .then((data) => {
+          setDrivers(
+            (data ?? []).map((ev) => ({
+              id: ev.driver.id,
+              name: ev.driver.name,
+              vehicle: `${ev.vehicle.model} (${ev.vehicle.plate})`,
+            })),
+          );
+        })
+        .catch(() => setDrivers([]))
+        .finally(() => setLoadingDrivers(false));
+    }
+  }, [assignModal, eventId]);
+
+  const handleDirectAssign = () => {
+    if (!assignModal || !selectedDriver) return;
+    directAssign.mutate(
+      { passengerId: assignModal.passengerId, driverId: selectedDriver },
+      {
+        onSuccess: () => {
+          setAssignModal(null);
+          refetch();
+        },
+      },
+    );
+  };
 
   if (isLoading || eventLoading) {
     return (
@@ -184,10 +236,37 @@ export default function EventRequestsPage() {
                             <XCircle className="size-3.5" />
                             Rechazar
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setAssignModal({
+                                requestId: req.id,
+                                passengerId: req.passengerId,
+                              })
+                            }
+                            className="border-primary/30 text-primary hover:bg-primary/10"
+                          >
+                            <UserPlus className="size-3.5" />
+                            Asignar a...
+                          </Button>
                         </div>
                       </td>
                     )}
-                    {canManage && req.status !== 'PENDING' && (
+                    {isOwnPending(req) && !canManage && (
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCancelModal(req.id)}
+                          className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                        >
+                          <Ban className="size-3.5" />
+                          Cancelar
+                        </Button>
+                      </td>
+                    )}
+                    {((canManage && req.status !== 'PENDING') || (!isOwnPending(req) && !canManage)) && (
                       <td className="px-4 py-3 text-right">
                         <Badge variant={statusToBadge(req.status)}>
                           {req.status}
@@ -201,6 +280,91 @@ export default function EventRequestsPage() {
           </div>
         </Card>
       )}
+      {/* Cancel confirmation modal */}
+      <Modal
+        open={!!cancelModal}
+        onClose={() => setCancelModal(null)}
+        title="Cancelar solicitud"
+      >
+        <p className="mb-4 text-sm text-text-secondary">
+          ¿Seguro que deseas cancelar tu solicitud de viaje? Esta acción no se puede deshacer.
+        </p>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => {
+              if (cancelModal) {
+                cancelRequest.mutate(cancelModal);
+                setCancelModal(null);
+              }
+            }}
+            loading={cancelRequest.isPending}
+            variant="destructive"
+          >
+            Cancelar solicitud
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCancelModal(null)}
+          >
+            Volver
+          </Button>
+        </div>
+      </Modal>
+      {/* Assign driver modal */}
+      <Modal
+        open={!!assignModal}
+        onClose={() => setAssignModal(null)}
+        title="Asignar pasajero a conductor"
+      >
+        <div className="flex flex-col gap-4">
+          {loadingDrivers ? (
+            <p className="text-sm text-text-secondary">Cargando conductores disponibles...</p>
+          ) : drivers.length === 0 ? (
+            <p className="text-sm text-text-secondary">
+              No hay conductores disponibles para este evento.
+            </p>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="driver-select" className="mb-1 block text-sm font-medium">
+                  Seleccionar conductor
+                </label>
+                <select
+                  id="driver-select"
+                  value={selectedDriver}
+                  onChange={(e) => setSelectedDriver(e.target.value)}
+                  className="flex w-full rounded-md border bg-surface px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">— Selecciona un conductor —</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} — {d.vehicle}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  onClick={handleDirectAssign}
+                  loading={directAssign.isPending}
+                  disabled={!selectedDriver}
+                >
+                  <UserPlus className="size-4" />
+                  Asignar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAssignModal(null)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
     </PageContainer>
   );
 }

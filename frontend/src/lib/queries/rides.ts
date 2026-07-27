@@ -45,6 +45,32 @@ export function useUpdateRequestStatus() {
   });
 }
 
+export function useCancelRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (requestId: string) =>
+      apiClient.patch<RideRequest>(`/requests/${requestId}`, {
+        status: 'CANCELLED' as RequestStatus,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'stats'] });
+    },
+  });
+}
+
+export function useDirectAssign(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { passengerId: string; driverId: string }) =>
+      apiClient.post<unknown>(`/events/${eventId}/direct-assign`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'stats'] });
+    },
+  });
+}
+
 export function useAutoAssign(eventId: string) {
   const queryClient = useQueryClient();
   return useMutation({

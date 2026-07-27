@@ -81,6 +81,7 @@ export function useCreateEvent(organizationId: string) {
       destination: string;
       capacity?: number;
       description?: string;
+      arrivalTime: string;
       originLat?: number;
       originLng?: number;
       destLat?: number;
