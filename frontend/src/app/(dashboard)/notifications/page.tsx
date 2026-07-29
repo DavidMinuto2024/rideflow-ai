@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Check, CheckCheck, Car, Clock, UserPlus, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, Car, Clock, UserPlus, X, XCircle } from 'lucide-react';
 import {
   useNotifications,
   useMarkAsRead,
@@ -29,6 +29,11 @@ const typeConfig: Record<
   RIDE_REJECTED: {
     icon: <X className="size-4" />,
     label: 'Viaje rechazado',
+    variant: 'error',
+  },
+  RIDE_CANCELLED: {
+    icon: <XCircle className="size-4" />,
+    label: 'Cancelación',
     variant: 'error',
   },
   TRIP_ASSIGNED: {

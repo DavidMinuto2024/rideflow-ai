@@ -5,6 +5,7 @@ export type NotificationType =
   | 'RIDE_REQUESTED'
   | 'RIDE_APPROVED'
   | 'RIDE_REJECTED'
+  | 'RIDE_CANCELLED'
   | 'TRIP_ASSIGNED'
   | 'EVENT_REMINDER';
 

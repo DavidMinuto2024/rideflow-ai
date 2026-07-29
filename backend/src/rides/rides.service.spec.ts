@@ -87,6 +87,9 @@ describe('RidesService', () => {
 
       suggestionsService.optimizeTimes.mockResolvedValue({ message: 'No trips to optimize' });
 
+      // Query 3: organization_members from notifyEventAdmins (empty — no admin notifications)
+      supabase._pushResult([]);
+
       const result = await service.updateRequestStatus(
         'request-3',
         { status: RequestStatus.CANCELLED },
@@ -97,11 +100,11 @@ describe('RidesService', () => {
         id: 'request-3',
         status: RequestStatus.CANCELLED,
       });
-      // Should NOT query organization_members (role check bypassed)
+      // notifyEventAdmins queries organization_members (role check still bypassed)
       const orgMemberCalls = (supabase.from as jest.Mock).mock.calls.filter(
         (call: unknown[]) => call[0] === 'organization_members',
       );
-      expect(orgMemberCalls).toHaveLength(0);
+      expect(orgMemberCalls).toHaveLength(1);
     });
 
     it('enforces role check for a non-passenger cancelling a PENDING request', async () => {
@@ -164,6 +167,11 @@ describe('RidesService', () => {
         passenger: { id: 'passenger-1', name: 'Passenger One', email: 'p1@example.com' },
       });
 
+      // Query 4: organization_members from notifyEventAdmins
+      supabase._pushResult([
+        { user_id: 'admin-2' },
+      ]);
+
       suggestionsService.optimizeTimes.mockResolvedValue({
         message: 'Optimized times for 1 trip(s)',
         arrivalTime: '2026-08-01T09:00:00.000Z',
@@ -215,6 +223,14 @@ describe('RidesService', () => {
         message: expect.stringContaining('Your estimated pickup time has been updated to'),
         userId: 'passenger-3',
       });
+      // Admin notification from notifyEventAdmins
+      expect(notifications.create).toHaveBeenNthCalledWith(4, {
+        type: 'RIDE_CANCELLED',
+        title: 'Ride cancelled',
+        message: expect.stringContaining('Passenger One cancelled'),
+        userId: 'admin-2',
+      });
+      expect(notifications.create).toHaveBeenCalledTimes(4);
       expect(result).toMatchObject({
         id: 'request-1',
         status: RequestStatus.CANCELLED,
@@ -250,6 +266,11 @@ describe('RidesService', () => {
         passenger: { id: 'passenger-9', name: 'Passenger Nine', email: 'p9@example.com' },
       });
 
+      // Query 4: organization_members from notifyEventAdmins
+      supabase._pushResult([
+        { user_id: 'admin-2' },
+      ]);
+
       suggestionsService.optimizeTimes.mockRejectedValue(new Error('OSRM unavailable'));
 
       await expect(
@@ -264,12 +285,18 @@ describe('RidesService', () => {
       });
 
       expect(suggestionsService.optimizeTimes).toHaveBeenCalledWith('event-2');
-      expect(notifications.create).toHaveBeenCalledTimes(1);
-      expect(notifications.create).toHaveBeenCalledWith({
+      expect(notifications.create).toHaveBeenCalledTimes(2);
+      expect(notifications.create).toHaveBeenNthCalledWith(1, {
         type: 'RIDE_CANCELLED',
         title: 'Ride cancelled',
         message: 'Your ride request for "Evening return" was cancelled',
         userId: 'passenger-9',
+      });
+      expect(notifications.create).toHaveBeenNthCalledWith(2, {
+        type: 'RIDE_CANCELLED',
+        title: 'Ride cancelled',
+        message: expect.stringContaining('Passenger Nine cancelled'),
+        userId: 'admin-2',
       });
     });
   });

@@ -56,6 +56,19 @@ export default function EventRequestsPage() {
   const [selectedDriver, setSelectedDriver] = useState('');
   const [loadingDrivers, setLoadingDrivers] = useState(false);
   const directAssign = useDirectAssign(eventId);
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+
+  const FILTER_OPTIONS = [
+    { value: null, label: 'Todas' },
+    { value: 'PENDING', label: 'Pendientes' },
+    { value: 'ACCEPTED', label: 'Aceptadas' },
+    { value: 'REJECTED', label: 'Rechazadas' },
+    { value: 'CANCELLED', label: 'Canceladas' },
+  ] as const;
+
+  const filteredRequests = (filterStatus
+    ? requests?.filter((r) => r.status === filterStatus)
+    : requests) ?? [];
 
   const canManage = session?.memberships?.some((m) => {
     if (!event) return false;
@@ -151,6 +164,34 @@ export default function EventRequestsPage() {
         </Card>
       )}
 
+      {/* Status filter tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {FILTER_OPTIONS.map((opt) => {
+          const isActive = filterStatus === opt.value;
+          const count = opt.value
+            ? requests?.filter((r) => r.status === opt.value).length ?? 0
+            : requests?.length ?? 0;
+          return (
+            <button
+              key={opt.value ?? 'all'}
+              onClick={() => setFilterStatus(opt.value)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition
+                ${isActive
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-surface-hover text-text-secondary hover:bg-surface-hover/80'
+                }`}
+            >
+              {opt.label}
+              <span className={`size-4 inline-flex items-center justify-center rounded-full text-[10px] font-bold
+                ${isActive ? 'bg-white/20' : 'bg-border/50'}
+              `}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {!requests || requests.length === 0 ? (
         <Card glass>
           <CardContent className="p-12 text-center">
@@ -171,6 +212,7 @@ export default function EventRequestsPage() {
                 <tr className="border-b border-border text-left text-text-secondary">
                   <th className="px-4 py-3 font-medium">Pasajero</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
+                  <th className="px-4 py-3 font-medium">Fecha del evento</th>
                   <th className="px-4 py-3 font-medium">Solicitado</th>
                   {canManage && (
                     <th className="px-4 py-3 text-right font-medium">Acciones</th>
@@ -178,7 +220,7 @@ export default function EventRequestsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {requests.map((req) => (
+                {filteredRequests.map((req) => (
                   <tr key={req.id} className="transition hover:bg-surface/50">
                     <td className="px-4 py-3">
                       <div className="font-medium">
@@ -194,6 +236,15 @@ export default function EventRequestsPage() {
                       <Badge variant={statusToBadge(req.status)}>
                         {req.status}
                       </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary">
+                      {event?.date
+                        ? new Date(event.date).toLocaleDateString('es-CO', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })
+                        : '—'}
                     </td>
                     <td className="px-4 py-3 text-text-secondary">
                       {new Date(req.createdAt).toLocaleDateString('es', {

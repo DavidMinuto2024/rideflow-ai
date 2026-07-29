@@ -219,9 +219,20 @@ export class RidesService {
       userId: request.passenger_id,
     });
 
-    // On cancellation, trigger re-optimization and notify affected passengers
+    // On cancellation, trigger re-optimization, notify affected passengers, and notify admins
     if (dto.status === RequestStatus.CANCELLED) {
       await this.handleCancellationReoptimization(request.event_id);
+
+      // Notify event admins about the cancellation
+      await this.notifyEventAdmins(
+        request.event.organization_id,
+        'RIDE_CANCELLED',
+        {
+          title: 'Ride cancelled',
+          message: `${request.passenger?.name || 'A passenger'} cancelled their ride for "${request.event.title}"`,
+          eventId: request.event_id,
+        },
+      );
     }
 
     return updated;

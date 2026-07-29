@@ -139,6 +139,69 @@ describe('EventRequestsPage — Cancel Button', () => {
   });
 });
 
+describe('EventRequestsPage — Event Date Column (#8)', () => {
+  it('shows Fecha del evento column header', async () => {
+    setupMocks({
+      role: 'ORG_ADMIN',
+      requests: [pendingRequest],
+      currentUserId: 'admin-1',
+    });
+    render(<EventRequestsPage />);
+
+    expect(screen.getByText('Fecha del evento')).toBeInTheDocument();
+  });
+
+  it('renders formatted event date in each row', async () => {
+    setupMocks({
+      role: 'ORG_ADMIN',
+      requests: [pendingRequest],
+      currentUserId: 'admin-1',
+    });
+    mockUseEvent.mockReturnValue({
+      data: { ...baseEvent, date: '2026-05-15T14:00:00Z' },
+      isLoading: false,
+    });
+    render(<EventRequestsPage />);
+
+    // Should show formatted date with year
+    expect(screen.getByText(/2026/)).toBeInTheDocument();
+  });
+});
+
+describe('EventRequestsPage — Status Filter (#9)', () => {
+  it('shows filter tabs for all statuses', async () => {
+    setupMocks({
+      role: 'ORG_ADMIN',
+      requests: [pendingRequest],
+      currentUserId: 'admin-1',
+    });
+    render(<EventRequestsPage />);
+
+    expect(screen.getByText('Todas')).toBeInTheDocument();
+    expect(screen.getByText('Pendientes')).toBeInTheDocument();
+    expect(screen.getByText('Aceptadas')).toBeInTheDocument();
+    expect(screen.getByText('Rechazadas')).toBeInTheDocument();
+    expect(screen.getByText('Canceladas')).toBeInTheDocument();
+  });
+
+  it('shows correct counts in filter tabs', async () => {
+    setupMocks({
+      role: 'ORG_ADMIN',
+      requests: [pendingRequest, acceptedRequest],
+      currentUserId: 'admin-1',
+    });
+    render(<EventRequestsPage />);
+
+    // "Todas (2)", "Pendientes (1)", "Aceptadas (1)"
+    const todaysBtn = screen.getByText(/Todas/);
+    expect(todaysBtn.textContent).toContain('2');
+    const pendientesBtn = screen.getByText(/Pendientes/);
+    expect(pendientesBtn.textContent).toContain('1');
+    const aceptadasBtn = screen.getByText(/Aceptadas/);
+    expect(aceptadasBtn.textContent).toContain('1');
+  });
+});
+
 describe('EventRequestsPage — Direct Assign', () => {
   it('shows Asignar a... button for ORG_ADMIN on PENDING request', async () => {
     setupMocks({
