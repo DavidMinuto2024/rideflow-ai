@@ -5,6 +5,7 @@ import {
   Delete,
   Param,
   Body,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -37,8 +38,9 @@ export class AdminController {
   async updateUserRole(
     @Param('userId') userId: string,
     @Body() dto: UpdateUserRoleDto,
+    @Req() request: any,
   ) {
-    return this.adminService.updateUserRole(userId, dto);
+    return this.adminService.updateUserRole(userId, dto, request.user.id);
   }
 
   @Delete('users/:userId')

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 
@@ -120,7 +124,15 @@ export class AdminService {
   async updateUserRole(
     userId: string,
     dto: UpdateUserRoleDto,
+    authUserId: string,
   ) {
+    // Prevent self-demotion — a SUPER_ADMIN cannot demote themselves
+    if (userId === authUserId) {
+      throw new BadRequestException(
+        'Cannot change your own role. Ask another SUPER_ADMIN to do it.',
+      );
+    }
+
     // Verify user exists
     const { data: user, error: userError } = await this.supabase
       .from('users')

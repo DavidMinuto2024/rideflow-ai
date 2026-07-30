@@ -1,6 +1,6 @@
 import { AdminService } from '../admin.service';
 import { SupabaseDataService } from '../../supabase/supabase-data.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 function createMockSupabase() {
   const resultQueue: Array<Record<string, unknown>> = [];
@@ -193,7 +193,7 @@ describe('AdminService', () => {
       const result = await service.updateUserRole('user-1', {
         organizationId: 'org-1',
         role: 'ORG_ADMIN' as any,
-      });
+      }, 'admin-user');
 
       expect(result.role).toBe('ORG_ADMIN');
       expect(supabase.from).toHaveBeenCalledWith('organization_members');
@@ -206,8 +206,17 @@ describe('AdminService', () => {
         service.updateUserRole('user-nonexistent', {
           organizationId: 'org-1',
           role: 'DRIVER' as any,
-        }),
+        }, 'admin-user'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when SUPER_ADMIN tries to self-demote', async () => {
+      await expect(
+        service.updateUserRole('self-user', {
+          organizationId: 'org-1',
+          role: 'PASSENGER' as any,
+        }, 'self-user'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException when user is not a member of the org', async () => {
@@ -218,7 +227,7 @@ describe('AdminService', () => {
         service.updateUserRole('user-1', {
           organizationId: 'org-nonexistent',
           role: 'DRIVER' as any,
-        }),
+        }, 'admin-user'),
       ).rejects.toThrow(NotFoundException);
     });
   });
