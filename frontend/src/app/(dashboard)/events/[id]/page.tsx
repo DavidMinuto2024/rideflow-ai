@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Car, ClipboardList, Pencil, QrCode, SendHorizonal } from 'lucide-react';
+import { ArrowLeft, Car, ClipboardList, Pencil, QrCode, SendHorizonal, Sparkles } from 'lucide-react';
+import { DriverSuggestionsModal } from '@/components/trips/DriverSuggestionsModal';
 import {
   useEvent,
   useUpdateEvent,
@@ -77,6 +78,7 @@ export default function EventDetailPage() {
   const [editCapacity, setEditCapacity] = useState(4);
   const [editDescription, setEditDescription] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   const canEdit =
     event &&
@@ -103,7 +105,7 @@ export default function EventDetailPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError(null);
-    const eventDate = editTime ? `${editDate}T${editTime}:00` : `${editDate}T00:00:00`;
+    const eventDate = editTime ? new Date(`${editDate}T${editTime}:00`).toISOString() : new Date(`${editDate}T00:00:00`).toISOString();
     try {
       await updateEvent.mutateAsync({
         title: editTitle,
@@ -254,7 +256,21 @@ export default function EventDetailPage() {
             </Button>
           </Link>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSuggestionsOpen(true)}
+        >
+          <Sparkles className="size-4 text-primary" />
+          Sugerencias
+        </Button>
       </div>
+
+      <DriverSuggestionsModal
+        open={suggestionsOpen}
+        onClose={() => setSuggestionsOpen(false)}
+        eventId={id}
+      />
 
       {/* Details grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

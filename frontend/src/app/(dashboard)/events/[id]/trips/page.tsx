@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Car, Users, Route } from 'lucide-react';
+import { ArrowLeft, Car, Users, Route, Clock } from 'lucide-react';
 import { useEvent } from '@/lib/queries/events';
 import { useEventTrips } from '@/lib/queries/trips';
+import { useSession } from '@/lib/queries/auth';
+import { useOptimizeTimes } from '@/lib/queries/suggestions';
 import { PageContainer } from '@/components/PageContainer';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -25,22 +28,72 @@ export default function EventTripsPage() {
   const eventId = params.id as string;
   const { data: event, isLoading: eventLoading } = useEvent(eventId);
   const { data: trips, isLoading } = useEventTrips(eventId);
+  const { data: session } = useSession();
+  const optimizeTimes = useOptimizeTimes(eventId);
+  const [optimizeMessage, setOptimizeMessage] = useState<string | null>(null);
+  const [optimizeError, setOptimizeError] = useState<string | null>(null);
 
   if (isLoading || eventLoading) return <TripsListSkeleton />;
+
+  const canOptimize =
+    !!event?.arrivalTime &&
+    !!trips &&
+    trips.length > 0 &&
+    (session?.memberships?.some(
+      (m) =>
+        m.organization.id === event.organizationId &&
+        ['ORG_ADMIN', 'DRIVER', 'SUPER_ADMIN'].includes(m.role),
+    ) || session?.user?.role === 'SUPER_ADMIN');
+
+  const handleOptimize = async () => {
+    setOptimizeMessage(null);
+    setOptimizeError(null);
+    try {
+      const res = await optimizeTimes.mutateAsync();
+      setOptimizeMessage(
+        res?.message || `Tiempos optimizados exitosamente (${res?.updatedTrips ?? 0} viajes actualizados).`,
+      );
+    } catch {
+      setOptimizeError('Error al optimizar los tiempos de los viajes.');
+    }
+  };
 
   return (
     <PageContainer
       title="Viajes"
       description={event ? `Viajes programados para ${event.title}` : undefined}
       action={
-        <Link href={`/events/${eventId}`}>
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="size-4" />
-            Volver al evento
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {canOptimize && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOptimize}
+              loading={optimizeTimes.isPending}
+            >
+              <Clock className="size-4" />
+              Optimizar tiempos
+            </Button>
+          )}
+          <Link href={`/events/${eventId}`}>
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="size-4" />
+              Volver al evento
+            </Button>
+          </Link>
+        </div>
       }
     >
+      {optimizeMessage && (
+        <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-400">
+          {optimizeMessage}
+        </div>
+      )}
+      {optimizeError && (
+        <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {optimizeError}
+        </div>
+      )}
       {!trips || trips.length === 0 ? (
         <Card glass>
           <CardContent className="p-12 text-center">

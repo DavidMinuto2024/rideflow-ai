@@ -32,6 +32,10 @@ vi.mock('@/lib/maps', () => ({
   buildGoogleMapsDeepLink: vi.fn(),
 }));
 
+vi.mock('@/lib/queries/suggestions', () => ({
+  useSuggestions: () => ({ data: [], isLoading: false }),
+}));
+
 import EventDetailPage from '../page';
 
 const baseEvent: Event = {

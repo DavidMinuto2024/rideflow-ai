@@ -31,12 +31,12 @@ export interface OptimizeTimesResponse {
 /**
  * Fetch ranked driver suggestions for all pending passengers in an event.
  */
-export function useSuggestions(eventId: string) {
+export function useSuggestions(eventId: string, enabled = true) {
   return useQuery<EventSuggestions[]>({
     queryKey: ['events', eventId, 'suggestions'],
     queryFn: () =>
       apiClient.get<EventSuggestions[]>(`/events/${eventId}/suggestions`),
-    enabled: !!eventId,
+    enabled: !!eventId && enabled,
   });
 }
 
