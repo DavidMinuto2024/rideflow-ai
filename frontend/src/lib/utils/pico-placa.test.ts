@@ -11,95 +11,95 @@ describe('Pico y Placa Client Utility', () => {
   describe('checkPicoYPlacaClient', () => {
     // Monday: plates ending in 1,2
     it('returns true for plate ending in 1 on Monday', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z'); // Monday
+      const monday = new Date('2026-07-20T07:30:00'); // Monday
       expect(checkPicoYPlacaClient('ABC121', monday)).toBe(true);
     });
 
     it('returns true for plate ending in 2 on Monday', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(checkPicoYPlacaClient('XYZ992', monday)).toBe(true);
     });
 
     it('returns false for plate ending in 3 on Monday', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(checkPicoYPlacaClient('ABC123', monday)).toBe(false);
     });
 
     // Tuesday: plates ending in 3,4
     it('returns true for plate ending in 3 on Tuesday', () => {
-      const tuesday = new Date('2026-07-21T12:00:00.000Z'); // Tuesday
+      const tuesday = new Date('2026-07-21T07:30:00'); // Tuesday
       expect(checkPicoYPlacaClient('ABC123', tuesday)).toBe(true);
     });
 
     it('returns true for plate ending in 4 on Tuesday', () => {
-      const tuesday = new Date('2026-07-21T12:00:00.000Z');
+      const tuesday = new Date('2026-07-21T07:30:00');
       expect(checkPicoYPlacaClient('XYZ994', tuesday)).toBe(true);
     });
 
     // Wednesday: plates ending in 5,6
     it('returns true for plate ending in 5 on Wednesday', () => {
-      const wednesday = new Date('2026-07-22T12:00:00.000Z'); // Wednesday
+      const wednesday = new Date('2026-07-22T07:30:00'); // Wednesday
       expect(checkPicoYPlacaClient('ABC125', wednesday)).toBe(true);
     });
 
     it('returns true for plate ending in 6 on Wednesday', () => {
-      const wednesday = new Date('2026-07-22T12:00:00.000Z');
+      const wednesday = new Date('2026-07-22T07:30:00');
       expect(checkPicoYPlacaClient('XYZ996', wednesday)).toBe(true);
     });
 
     // Thursday: plates ending in 7,8
     it('returns true for plate ending in 7 on Thursday', () => {
-      const thursday = new Date('2026-07-23T12:00:00.000Z'); // Thursday
+      const thursday = new Date('2026-07-23T07:30:00'); // Thursday
       expect(checkPicoYPlacaClient('ABC127', thursday)).toBe(true);
     });
 
     it('returns true for plate ending in 8 on Thursday', () => {
-      const thursday = new Date('2026-07-23T12:00:00.000Z');
+      const thursday = new Date('2026-07-23T07:30:00');
       expect(checkPicoYPlacaClient('XYZ998', thursday)).toBe(true);
     });
 
     // Friday: plates ending in 9,0
     it('returns true for plate ending in 9 on Friday', () => {
-      const friday = new Date('2026-07-24T12:00:00.000Z'); // Friday
+      const friday = new Date('2026-07-24T07:30:00'); // Friday
       expect(checkPicoYPlacaClient('ABC129', friday)).toBe(true);
     });
 
     it('returns true for plate ending in 0 on Friday', () => {
-      const friday = new Date('2026-07-24T12:00:00.000Z');
+      const friday = new Date('2026-07-24T07:30:00');
       expect(checkPicoYPlacaClient('XYZ990', friday)).toBe(true);
     });
 
     // Weekend: no restriction
     it('returns false on Saturday regardless of plate', () => {
-      const saturday = new Date('2026-07-25T12:00:00.000Z'); // Saturday
+      const saturday = new Date('2026-07-25T07:30:00'); // Saturday
       expect(checkPicoYPlacaClient('ABC129', saturday)).toBe(false);
       expect(checkPicoYPlacaClient('ABC121', saturday)).toBe(false);
     });
 
     it('returns false on Sunday regardless of plate', () => {
-      const sunday = new Date('2026-07-26T12:00:00.000Z'); // Sunday
+      const sunday = new Date('2026-07-26T07:30:00'); // Sunday
       expect(checkPicoYPlacaClient('ABC129', sunday)).toBe(false);
       expect(checkPicoYPlacaClient('ABC121', sunday)).toBe(false);
     });
 
     // Edge cases
     it('returns false for null plate', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(checkPicoYPlacaClient(null, monday)).toBe(false);
     });
 
     it('returns false for undefined plate', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(checkPicoYPlacaClient(undefined, monday)).toBe(false);
     });
 
     it('returns false for empty string plate', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(checkPicoYPlacaClient('', monday)).toBe(false);
     });
 
     it('returns false for plate with non-numeric last character', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(checkPicoYPlacaClient('ABCDEF', monday)).toBe(false);
     });
   });
@@ -174,35 +174,35 @@ describe('Pico y Placa Client Utility', () => {
 
   describe('getRestrictedDayNameES', () => {
     it('returns "Lunes" for plate ending in 1 on Monday', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(getRestrictedDayNameES('ABC121', monday)).toBe('Lunes');
     });
 
     it('returns "Miércoles" for plate ending in 5 on Wednesday', () => {
-      const wednesday = new Date('2026-07-22T12:00:00.000Z');
+      const wednesday = new Date('2026-07-22T07:30:00');
       expect(getRestrictedDayNameES('ABC125', wednesday)).toBe('Miércoles');
     });
 
     it('returns "Viernes" for plate ending in 9 on Friday', () => {
-      const friday = new Date('2026-07-24T12:00:00.000Z');
+      const friday = new Date('2026-07-24T07:30:00');
       expect(getRestrictedDayNameES('ABC129', friday)).toBe('Viernes');
     });
 
     it('returns null for weekend', () => {
-      const saturday = new Date('2026-07-25T12:00:00.000Z');
-      const sunday = new Date('2026-07-26T12:00:00.000Z');
+      const saturday = new Date('2026-07-25T07:30:00');
+      const sunday = new Date('2026-07-26T07:30:00');
       expect(getRestrictedDayNameES('ABC129', saturday)).toBeNull();
       expect(getRestrictedDayNameES('ABC129', sunday)).toBeNull();
     });
 
     it('returns null for non-restricted day', () => {
-      const tuesday = new Date('2026-07-21T12:00:00.000Z');
+      const tuesday = new Date('2026-07-21T07:30:00');
       // Plate ending in 1 is restricted on Monday, not Tuesday
       expect(getRestrictedDayNameES('ABC121', tuesday)).toBeNull();
     });
 
     it('returns null for null/empty plate', () => {
-      const monday = new Date('2026-07-20T12:00:00.000Z');
+      const monday = new Date('2026-07-20T07:30:00');
       expect(getRestrictedDayNameES(null, monday)).toBeNull();
       expect(getRestrictedDayNameES('', monday)).toBeNull();
     });

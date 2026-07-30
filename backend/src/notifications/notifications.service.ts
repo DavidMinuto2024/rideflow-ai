@@ -1,12 +1,14 @@
 import {
   Injectable,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { EmailService } from './email.service';
 import { PushService } from './push.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Notification types used across the platform:
@@ -35,6 +37,7 @@ export class NotificationsService {
     private readonly supabase: SupabaseDataService,
     private readonly emailService: EmailService,
     private readonly pushService: PushService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async findByUser(userId: string) {
@@ -77,32 +80,17 @@ export class NotificationsService {
    * Creates default preferences (email=true, push=true) if none exist.
    */
   private async getPreferencesInternal(userId: string): Promise<{ email: boolean; push: boolean }> {
-    const { data: pref, error: findError } = await this.supabase
-      .from('notification_preferences')
-      .select('email, push')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (findError) this.supabase.handleError(findError, 'notification_preferences');
-
-    if (pref) {
-      return { email: pref.email, push: pref.push };
-    }
-
-    // Create default preferences
-    const { data: newPref, error: createError } = await this.supabase
-      .from('notification_preferences')
-      .insert({
-        id: crypto.randomUUID(),
-        user_id: userId,
+    const pref = await this.prisma.notificationPreference.upsert({
+      where: { userId },
+      update: {},
+      create: {
+        userId,
         email: true,
         push: true,
-      })
-      .select('email, push')
-      .single();
+      },
+    });
 
-    if (createError) this.supabase.handleError(createError, 'notification_preferences');
-    return { email: newPref.email, push: newPref.push };
+    return { email: pref.email, push: pref.push };
   }
 
   async create(dto: CreateNotificationDto) {
@@ -217,13 +205,18 @@ export class NotificationsService {
   }
 
   /**
-   * Revoke all device tokens for a user (logout).
+   * Revoke a specific device token for a user (logout from one device).
    */
-  async revokeDeviceToken(userId: string) {
+  async revokeDeviceToken(userId: string, token: string) {
+    if (!token?.trim()) {
+      throw new BadRequestException('Device token is required');
+    }
+
     const { error } = await this.supabase
       .from('user_device_tokens')
       .delete()
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('token', token);
 
     if (error) this.supabase.handleError(error, 'user_device_tokens');
   }
@@ -242,18 +235,16 @@ export class NotificationsService {
     userId: string,
     dto: { email?: boolean; push?: boolean },
   ): Promise<{ email: boolean; push: boolean }> {
-    const { data, error } = await this.supabase
-      .from('notification_preferences')
-      .upsert({
-        id: crypto.randomUUID(),
-        user_id: userId,
-        email: dto.email ?? true,
-        push: dto.push ?? true,
-      }, { onConflict: 'user_id' })
-      .select('email, push')
-      .single();
+    const prefs = await this.getPreferencesInternal(userId);
+    
+    const updated = await this.prisma.notificationPreference.update({
+      where: { userId },
+      data: {
+        email: dto.email ?? prefs.email,
+        push: dto.push ?? prefs.push,
+      }
+    });
 
-    if (error) this.supabase.handleError(error, 'notification_preferences');
-    return { email: data.email, push: data.push };
+    return { email: updated.email, push: updated.push };
   }
 }

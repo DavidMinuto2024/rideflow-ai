@@ -1,6 +1,7 @@
 import { NotificationsService } from '../notifications.service';
 import { EmailService } from '../email.service';
 import { PushService } from '../push.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 function createThenable<T>(value: T) {
   const promise = Promise.resolve(value);
@@ -32,6 +33,8 @@ describe('NotificationsService & Multichannel (#12)', () => {
   let pushService: PushService;
   let mockSupabase: any;
 
+  let mockPrisma: any;
+
   beforeEach(() => {
     emailService = new EmailService();
     pushService = new PushService();
@@ -41,11 +44,18 @@ describe('NotificationsService & Multichannel (#12)', () => {
         throw new Error(err.message || 'Supabase error');
       }),
     };
+    mockPrisma = {
+      notificationPreference: {
+        upsert: jest.fn().mockResolvedValue({ email: true, push: true }),
+        update: jest.fn().mockResolvedValue({ email: true, push: true }),
+      },
+    };
 
     service = new NotificationsService(
       mockSupabase as any,
       emailService,
       pushService,
+      mockPrisma as PrismaService,
     );
   });
 
@@ -73,12 +83,9 @@ describe('NotificationsService & Multichannel (#12)', () => {
 
   describe('NotificationsService Multichannel Dispatch', () => {
     // Helper to mock both notifications and preferences tables
-    const mockNotificationsAndPrefs = (notifData: any) => {
-      let callCount = 0;
+    const mockNotificationsAndPrefs = (notifData: any, prefs = { email: true, push: true }) => {
+      mockPrisma.notificationPreference.upsert.mockResolvedValue(prefs);
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'notification_preferences') {
-          return createQuery({ data: { email: true, push: true }, error: null });
-        }
         if (table === 'notifications') {
           return createQuery({ data: notifData, error: null });
         }
@@ -152,11 +159,9 @@ describe('NotificationsService & Multichannel (#12)', () => {
         user_id: 'user-2',
       };
 
-      // Mock preferences with push=false
+      // Mock preferences with push=false via Prisma mock
+      mockPrisma.notificationPreference.upsert.mockResolvedValue({ email: true, push: false });
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'notification_preferences') {
-          return createQuery({ data: { email: true, push: false }, error: null });
-        }
         if (table === 'notifications') {
           return createQuery({ data: fakeNotif, error: null });
         }
@@ -183,11 +188,9 @@ describe('NotificationsService & Multichannel (#12)', () => {
         user_id: 'user-3',
       };
 
-      // Mock preferences with email=false
+      // Mock preferences with email=false via Prisma mock
+      mockPrisma.notificationPreference.upsert.mockResolvedValue({ email: false, push: true });
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'notification_preferences') {
-          return createQuery({ data: { email: false, push: true }, error: null });
-        }
         if (table === 'notifications') {
           return createQuery({ data: fakeNotif, error: null });
         }

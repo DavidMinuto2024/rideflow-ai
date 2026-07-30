@@ -86,6 +86,8 @@ model User {
   assignments    PassengerAssignment[]
   notifications  Notification[]
   eventVehicles  EventVehicle[]
+  deviceTokens   UserDeviceToken[]
+  notificationPref NotificationPreference?
 }
 
 // ─── OrganizationMember ───────────────────────────────────
@@ -269,11 +271,13 @@ model Notification {
   message   String?
   read      Boolean  @default(false)
 
-  userId    String
+  userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("notifications")
 }
 
 // ─── UserDeviceToken ────────────────────────────────────────
@@ -281,13 +285,15 @@ model Notification {
 
 model UserDeviceToken {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String   @unique
   platform  String   // 'web', 'ios', 'android'
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@map("user_device_tokens")
 }
 
 // ─── NotificationPreference ─────────────────────────────────
@@ -295,9 +301,12 @@ model UserDeviceToken {
 
 model NotificationPreference {
   id        String   @id @default(cuid())
-  userId    String   @unique
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   email     Boolean  @default(true)
   push      Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("notification_preferences")
 }

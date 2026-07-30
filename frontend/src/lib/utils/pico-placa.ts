@@ -48,16 +48,45 @@ const RESTRICTED_DIGITS: Record<number, number[]> = {
  * @returns true if restricted, false otherwise
  */
 export function checkPicoYPlacaClient(plate: string | null | undefined, date: Date): boolean {
-  if (!plate || plate.length === 0) return false;
+  if (!plate || plate.trim().length === 0) return false;
 
-  const lastDigit = parseInt(plate.slice(-1), 10);
+  const trimmedPlate = plate.trim();
+  const lastDigit = parseInt(trimmedPlate.slice(-1), 10);
   if (isNaN(lastDigit)) return false;
 
-  const dayOfWeek = date.getDay(); // 0=Sunday, 6=Saturday
+  // Evaluate day and time strictly in Bogotá timezone to avoid browser-locale drift
+  const bogotaParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Bogota',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(date);
+
+  const weekdayStr = bogotaParts.find((p) => p.type === 'weekday')?.value ?? '';
+  const hourStr = bogotaParts.find((p) => p.type === 'hour')?.value ?? '0';
+  const minuteStr = bogotaParts.find((p) => p.type === 'minute')?.value ?? '0';
+
+  // Map English short weekday to getDay() equivalent (0=Sun ... 6=Sat)
+  const WEEKDAY_MAP: Record<string, number> = {
+    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+  };
+  const dayOfWeek = WEEKDAY_MAP[weekdayStr] ?? -1;
   if (dayOfWeek === 0 || dayOfWeek === 6) return false; // Weekend: no restriction
 
   const restrictedDigits = RESTRICTED_DIGITS[dayOfWeek] ?? [];
-  return restrictedDigits.includes(lastDigit);
+  if (!restrictedDigits.includes(lastDigit)) return false;
+
+  const hours = parseInt(hourStr, 10);
+  const minutes = parseInt(minuteStr, 10);
+  const timeInMinutes = hours * 60 + minutes;
+
+  // 7:00 AM (420) to 9:00 AM exclusive (< 540)
+  const isMorning = timeInMinutes >= 420 && timeInMinutes < 540;
+  // 5:00 PM (1020) to 8:00 PM exclusive (< 1200)
+  const isEvening = timeInMinutes >= 1020 && timeInMinutes < 1200;
+
+  return isMorning || isEvening;
 }
 
 /**
@@ -71,9 +100,10 @@ export function checkPicoYPlacaClient(plate: string | null | undefined, date: Da
 export function getRestrictedDays(
   plate: string | null | undefined,
 ): ('Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri')[] {
-  if (!plate || plate.length === 0) return [];
+  if (!plate || plate.trim().length === 0) return [];
 
-  const lastDigit = parseInt(plate.slice(-1), 10);
+  const trimmedPlate = plate.trim();
+  const lastDigit = parseInt(trimmedPlate.slice(-1), 10);
   if (isNaN(lastDigit)) return [];
 
   const restrictedDays: ('Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri')[] = [];
@@ -101,9 +131,10 @@ export function getRestrictedDays(
  * @returns Spanish day name if restricted, null otherwise
  */
 export function getRestrictedDayNameES(plate: string | null | undefined, date: Date): string | null {
-  if (!plate || plate.length === 0) return null;
+  if (!plate || plate.trim().length === 0) return null;
 
-  const lastDigit = parseInt(plate.slice(-1), 10);
+  const trimmedPlate = plate.trim();
+  const lastDigit = parseInt(trimmedPlate.slice(-1), 10);
   if (isNaN(lastDigit)) return null;
 
   const dayOfWeek = date.getDay(); // 0=Sunday, 6=Saturday
@@ -131,7 +162,7 @@ export function getRestrictedDayNameES(plate: string | null | undefined, date: D
  * Returns -1 if plate is invalid or empty.
  */
 export function getLastDigit(plate: string | null | undefined): number {
-  if (!plate || plate.length === 0) return -1;
-  const digit = parseInt(plate.slice(-1), 10);
+  if (!plate || plate.trim().length === 0) return -1;
+  const digit = parseInt(plate.trim().slice(-1), 10);
   return isNaN(digit) ? -1 : digit;
 }

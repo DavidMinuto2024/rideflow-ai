@@ -55,11 +55,14 @@ export class NotificationsController {
     return this.notificationsService.registerDeviceToken(user.id, dto.token, dto.platform);
   }
 
-  @Delete('notifications/device-token')
+  @Delete('notifications/device-token/:token')
   @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async revokeDeviceToken(@CurrentUser() user: User) {
-    await this.notificationsService.revokeDeviceToken(user.id);
+  async revokeDeviceToken(
+    @CurrentUser() user: User,
+    @Param('token') token: string,
+  ) {
+    await this.notificationsService.revokeDeviceToken(user.id, token);
   }
 
   // Preferences endpoints

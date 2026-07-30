@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { AuthProvider } from '@/lib/auth-context';
 import { QueryProvider } from '@/lib/query-provider';
-import { subscribeUser, sendTokenToBackend } from '@/lib/push-service';
 
 export function Providers({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -14,14 +13,7 @@ export function Providers({ children }: { children: ReactNode }) {
     if (loading || !user) return;
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((registration) => {
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (vapidKey) {
-          subscribeUser(vapidKey)
-            .then((subscription) => sendTokenToBackend(subscription))
-            .catch(console.error);
-        }
-      }).catch(console.error);
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
   }, [user, loading]);
 

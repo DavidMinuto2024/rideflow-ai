@@ -1,8 +1,4 @@
-/**
- * RideFlow AI — Push Notification Service
- *
- * Handles Web Push subscription using VAPID and sends the subscription to the backend.
- */
+import { apiClient } from './api';
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -26,19 +22,13 @@ export async function subscribeUser(vapidPublicKey: string): Promise<PushSubscri
 }
 
 export async function sendTokenToBackend(subscription: PushSubscription): Promise<void> {
-  const response = await fetch('/api/notifications/device-token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  try {
+    await apiClient.post('/notifications/device-token', {
       token: JSON.stringify(subscription),
       platform: 'web',
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to send push token to backend: ${error}`);
+    });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to send push token to backend: ${errorMsg}`);
   }
 }
