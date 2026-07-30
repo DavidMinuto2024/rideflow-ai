@@ -238,24 +238,34 @@ describe('AdminService', () => {
         { id: 'org-1', name: 'Org Alpha', slug: 'org-alpha', created_at: '2026-01-01T00:00:00Z' },
         { id: 'org-2', name: 'Org Beta', slug: 'org-beta', created_at: '2026-02-01T00:00:00Z' },
       ];
+      const mockMembers = [
+        { organization_id: 'org-1' },
+        { organization_id: 'org-1' },
+        { organization_id: 'org-2' },
+      ];
+      const mockEvents = [
+        { organization_id: 'org-1' },
+        { organization_id: 'org-1' },
+        { organization_id: 'org-1' },
+        { organization_id: 'org-2' },
+      ];
 
+      // 1. orgs query → data
       supabase._pushDataOnly(mockOrgs);
-      // org-1: member count then event count
-      supabase._pushCountResult(10);
-      supabase._pushCountResult(3);
-      // org-2: member count then event count
-      supabase._pushCountResult(5);
-      supabase._pushCountResult(1);
+      // 2. members batch query → data (not head)
+      supabase._pushDataOnly(mockMembers);
+      // 3. events batch query → data
+      supabase._pushDataOnly(mockEvents);
 
       const result = await service.getOrganizations();
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Org Alpha');
       expect(result[0].slug).toBe('org-alpha');
-      expect(result[0].memberCount).toBe(10);
+      expect(result[0].memberCount).toBe(2);
       expect(result[0].eventCount).toBe(3);
       expect(result[1].name).toBe('Org Beta');
-      expect(result[1].memberCount).toBe(5);
+      expect(result[1].memberCount).toBe(1);
       expect(result[1].eventCount).toBe(1);
     });
 

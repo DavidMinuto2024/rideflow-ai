@@ -33,7 +33,41 @@ export interface AdminOrganization {
   slug: string;
   memberCount: number;
   eventCount: number;
-  createdAt: Date;
+  createdAt: string; // ISO string from Supabase REST API
+}
+
+// ── Supabase response shapes (no `as any` needed) ──────────
+
+interface SupabaseOrg {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+
+interface SupabaseOrgMember {
+  organization_id: string;
+}
+
+interface SupabaseEvent {
+  organization_id: string;
+}
+
+interface SupabaseUserWithMembers {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  avatar: string | null;
+  members: Array<{
+    organization_id: string;
+    role: string;
+    organization: { id: string; name: string } | null;
+  }>;
+}
+
+interface SupabaseEventData {
+  date: string;
 }
 
 @Injectable()
@@ -73,8 +107,8 @@ export class AdminService {
     const eventsPerMonth: { month: string; count: number }[] = [];
     if (eventsData && eventsData.length > 0) {
       const monthMap = new Map<string, number>();
-      for (const event of eventsData as { date: string }[]) {
-        const month = (event.date as string).substring(0, 7); // "2026-01"
+      for (const event of eventsData as SupabaseEventData[]) {
+        const month = event.date.substring(0, 7); // "2026-01"
         monthMap.set(month, (monthMap.get(month) || 0) + 1);
       }
       for (const [month, count] of monthMap.entries()) {
@@ -107,13 +141,13 @@ export class AdminService {
 
     if (error) this.supabase.handleError(error, 'users');
 
-    return (users || []).map((user: any) => ({
+    return (users || []).map((user: SupabaseUserWithMembers) => ({
       id: user.id,
       email: user.email,
       name: user.name,
       phone: user.phone,
       avatar: user.avatar,
-      memberships: (user.members || []).map((m: any) => ({
+      memberships: (user.members || []).map((m) => ({
         organizationId: m.organization_id,
         organizationName: m.organization?.name || 'Unknown',
         role: m.role,
@@ -181,36 +215,45 @@ export class AdminService {
 
     if (error) this.supabase.handleError(error, 'organizations');
 
-    const orgList = (orgs || []) as any[];
-    const result: AdminOrganization[] = [];
+    const orgList = (orgs || []) as SupabaseOrg[];
+    if (orgList.length === 0) return [];
 
-    for (const org of orgList) {
-      // Count members
-      const { count: memberCount, error: memberCountError } = await this.supabase
-        .from('organization_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', org.id);
+    const orgIds = orgList.map((o) => o.id);
 
-      if (memberCountError) this.supabase.handleError(memberCountError, 'organization_members');
+    // Batch-fetch member counts for ALL orgs in one query
+    const { data: memberRows, error: memberError } = await this.supabase
+      .from('organization_members')
+      .select('organization_id')
+      .in('organization_id', orgIds);
 
-      // Count events
-      const { count: eventCount, error: eventCountError } = await this.supabase
-        .from('events')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', org.id);
+    if (memberError) this.supabase.handleError(memberError, 'organization_members');
 
-      if (eventCountError) this.supabase.handleError(eventCountError, 'events');
+    // Batch-fetch event counts for ALL orgs in one query
+    const { data: eventRows, error: eventError } = await this.supabase
+      .from('events')
+      .select('organization_id')
+      .in('organization_id', orgIds);
 
-      result.push({
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        memberCount: memberCount || 0,
-        eventCount: eventCount || 0,
-        createdAt: org.created_at,
-      });
+    if (eventError) this.supabase.handleError(eventError, 'events');
+
+    // Build count maps (single pass through each result set)
+    const memberCountMap = new Map<string, number>();
+    for (const row of (memberRows || []) as SupabaseOrgMember[]) {
+      memberCountMap.set(row.organization_id, (memberCountMap.get(row.organization_id) || 0) + 1);
     }
 
-    return result;
+    const eventCountMap = new Map<string, number>();
+    for (const row of (eventRows || []) as SupabaseEvent[]) {
+      eventCountMap.set(row.organization_id, (eventCountMap.get(row.organization_id) || 0) + 1);
+    }
+
+    return orgList.map((org) => ({
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      memberCount: memberCountMap.get(org.id) || 0,
+      eventCount: eventCountMap.get(org.id) || 0,
+      createdAt: org.created_at,
+    }));
   }
 }

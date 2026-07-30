@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { Plus, Trash2, Building2 } from 'lucide-react';
 import { useAdminOrganizations, adminOrganizationsQueryKey } from '@/lib/queries/admin';
+import { useCreateOrganization } from '@/lib/queries/organizations';
 import { apiClient, ApiError } from '@/lib/api';
 import { PageContainer } from '@/components/PageContainer';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -62,18 +63,7 @@ function CreateOrgModal({
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: (data: { name: string; slug: string }) =>
-      apiClient.post('/organizations', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['organizations'] });
-      queryClient.invalidateQueries({ queryKey: adminOrganizationsQueryKey });
-      setName('');
-      setSlug('');
-      onClose();
-    },
-  });
+  const createOrg = useCreateOrganization();
 
   const handleSlugChange = (value: string) => {
     setSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-').replace(/^-|-$/g, ''));
@@ -104,14 +94,28 @@ function CreateOrgModal({
           />
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isPending}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={createOrg.isPending}>
             Cancel
           </Button>
           <Button
             size="sm"
-            loading={isPending}
+            loading={createOrg.isPending}
             disabled={!name.trim() || !slug.trim()}
-            onClick={() => mutate({ name: name.trim(), slug: slug.trim() })}
+            onClick={() =>
+              createOrg.mutate(
+                { name: name.trim(), slug: slug.trim() },
+                {
+                  onSuccess: () => {
+                    queryClient.invalidateQueries({
+                      queryKey: adminOrganizationsQueryKey,
+                    });
+                    setName('');
+                    setSlug('');
+                    onClose();
+                  },
+                },
+              )
+            }
           >
             Create
           </Button>

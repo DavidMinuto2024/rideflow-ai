@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 
 const mockApiClientGet = vi.fn();
 const mockApiClientPatch = vi.fn();
@@ -20,6 +23,21 @@ import {
   adminOrganizationsQueryKey,
 } from '../admin';
 import type { AdminStats, AdminUser, AdminOrganization } from '../admin';
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    );
+  };
+}
 
 const baseStatsResponse: AdminStats = {
   totalOrganizations: 5,
@@ -82,23 +100,18 @@ describe('useAdminStats', () => {
   it('fetches admin stats from /admin/stats', async () => {
     mockApiClientGet.mockResolvedValue(baseStatsResponse);
 
-    const result = await mockApiClientGet('/admin/stats');
-    expect(result).toEqual(baseStatsResponse);
+    const { result } = renderHook(() => useAdminStats(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual(baseStatsResponse);
     expect(mockApiClientGet).toHaveBeenCalledWith('/admin/stats');
   });
 
   it('exports the correct queryKey', () => {
     expect(adminStatsQueryKey).toEqual(['admin', 'stats']);
-  });
-
-  it('validates response structure', () => {
-    expect(baseStatsResponse.totalOrganizations).toBeTypeOf('number');
-    expect(baseStatsResponse.totalUsers).toBeTypeOf('number');
-    expect(baseStatsResponse.totalEvents).toBeTypeOf('number');
-    expect(baseStatsResponse.totalTrips).toBeTypeOf('number');
-    expect(Array.isArray(baseStatsResponse.eventsPerMonth)).toBe(true);
-    expect(baseStatsResponse.eventsPerMonth[0].month).toBeTypeOf('string');
-    expect(baseStatsResponse.eventsPerMonth[0].count).toBeTypeOf('number');
   });
 });
 
@@ -110,31 +123,18 @@ describe('useAdminUsers', () => {
   it('fetches admin users from /admin/users', async () => {
     mockApiClientGet.mockResolvedValue(baseUsersResponse);
 
-    const result = await mockApiClientGet('/admin/users');
-    expect(result).toEqual(baseUsersResponse);
+    const { result } = renderHook(() => useAdminUsers(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual(baseUsersResponse);
     expect(mockApiClientGet).toHaveBeenCalledWith('/admin/users');
   });
 
   it('exports the correct queryKey', () => {
     expect(adminUsersQueryKey).toEqual(['admin', 'users']);
-  });
-
-  it('validates response structure', () => {
-    expect(Array.isArray(baseUsersResponse)).toBe(true);
-    expect(baseUsersResponse[0].id).toBeTypeOf('string');
-    expect(baseUsersResponse[0].email).toBeTypeOf('string');
-    expect(baseUsersResponse[0].name).toBeTypeOf('string');
-    expect(Array.isArray(baseUsersResponse[0].memberships)).toBe(true);
-    expect(baseUsersResponse[0].memberships[0].organizationName).toBeTypeOf('string');
-  });
-
-  it('handles optional fields (phone, avatar)', () => {
-    expect(baseUsersResponse[1].phone).toBeUndefined();
-    expect(baseUsersResponse[1].avatar).toBeUndefined();
-  });
-
-  it('handles empty memberships', () => {
-    expect(baseUsersResponse[1].memberships).toHaveLength(0);
   });
 });
 
@@ -146,23 +146,18 @@ describe('useAdminOrganizations', () => {
   it('fetches admin organizations from /admin/organizations', async () => {
     mockApiClientGet.mockResolvedValue(baseOrganizationsResponse);
 
-    const result = await mockApiClientGet('/admin/organizations');
-    expect(result).toEqual(baseOrganizationsResponse);
+    const { result } = renderHook(() => useAdminOrganizations(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual(baseOrganizationsResponse);
     expect(mockApiClientGet).toHaveBeenCalledWith('/admin/organizations');
   });
 
   it('exports the correct queryKey', () => {
     expect(adminOrganizationsQueryKey).toEqual(['admin', 'organizations']);
-  });
-
-  it('validates response structure', () => {
-    expect(Array.isArray(baseOrganizationsResponse)).toBe(true);
-    expect(baseOrganizationsResponse[0].id).toBeTypeOf('string');
-    expect(baseOrganizationsResponse[0].name).toBeTypeOf('string');
-    expect(baseOrganizationsResponse[0].slug).toBeTypeOf('string');
-    expect(baseOrganizationsResponse[0].memberCount).toBeTypeOf('number');
-    expect(baseOrganizationsResponse[0].eventCount).toBeTypeOf('number');
-    expect(baseOrganizationsResponse[0].createdAt).toBeTypeOf('string');
   });
 });
 
@@ -172,23 +167,29 @@ describe('useUpdateUserRole', () => {
   });
 
   it('calls PATCH /admin/users/:userId with organizationId and role', async () => {
-    const params = { userId: 'user-1', organizationId: 'org-2', role: 'member' };
     mockApiClientPatch.mockResolvedValue({});
 
-    // Test the mutationFn contract directly
-    const result = await mockApiClientPatch(`/admin/users/${params.userId}`, {
-      organizationId: params.organizationId,
-      role: params.role,
+    const { result } = renderHook(() => useUpdateUserRole(), {
+      wrapper: createWrapper(),
     });
-    expect(result).toEqual({});
+
+    await result.current.mutateAsync({
+      userId: 'user-1',
+      organizationId: 'org-2',
+      role: 'member',
+    });
+
     expect(mockApiClientPatch).toHaveBeenCalledWith('/admin/users/user-1', {
       organizationId: 'org-2',
       role: 'member',
     });
   });
 
-  it('invalidates ["admin", "users"] on success (verified via useUpdateUserRole internals)', async () => {
-    // Ensure the function is importable and has the expected shape
-    expect(useUpdateUserRole).toBeTypeOf('function');
+  it('returns the expected mutationFn shape', () => {
+    const { result } = renderHook(() => useUpdateUserRole(), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.mutateAsync).toBeTypeOf('function');
   });
 });
