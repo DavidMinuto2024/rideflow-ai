@@ -35,6 +35,7 @@ export function useAdminStats() {
   return useQuery<AdminStats>({
     queryKey: adminStatsQueryKey,
     queryFn: () => apiClient.get<AdminStats>('/admin/stats'),
+    staleTime: 5 * 60 * 1000, // aggregate stats rarely change
   });
 }
 
@@ -42,6 +43,7 @@ export function useAdminUsers() {
   return useQuery<AdminUser[]>({
     queryKey: adminUsersQueryKey,
     queryFn: () => apiClient.get<AdminUser[]>('/admin/users'),
+    staleTime: 30 * 1000,
   });
 }
 
@@ -49,6 +51,7 @@ export function useAdminOrganizations() {
   return useQuery<AdminOrganization[]>({
     queryKey: adminOrganizationsQueryKey,
     queryFn: () => apiClient.get<AdminOrganization[]>('/admin/organizations'),
+    staleTime: 30 * 1000,
   });
 }
 

@@ -46,18 +46,27 @@ export async function api<T = unknown>(
     }
   }
 
-  const res = await fetch(`${API_BASE}/api${path}`, {
-    ...fetchOptions,
-    headers,
-  });
+  // 15-second timeout via AbortSignal
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new ApiError(res.status, errorBody || res.statusText);
+  try {
+    const res = await fetch(`${API_BASE}/api${path}`, {
+      ...fetchOptions,
+      headers,
+      signal: fetchOptions.signal ?? controller.signal,
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new ApiError(res.status, errorBody || res.statusText);
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
 }
 
 export class ApiError extends Error {

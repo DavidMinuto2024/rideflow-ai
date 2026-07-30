@@ -6,6 +6,7 @@ import {
   BadRequestException,
   ServiceUnavailableException,
   UnauthorizedException,
+  ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
 
@@ -70,7 +71,7 @@ const ERROR_RULES: Record<string, ErrorRule> = {
   // Permission denied (RLS or role-based)
   '403': {
     category: 'auth_error',
-    exception: UnauthorizedException,
+    exception: ForbiddenException,
     defaultMessage: 'Permission denied',
   },
   // Rate limited — TooManyRequestsException not available in @nestjs/common v10,
@@ -116,7 +117,8 @@ const NETWORK_TIMEOUT_MESSAGES = [
  * | 23503    | FK violation        | 400         |
  * | 42P01    | Undefined table     | 500         |
  * | Timeout  | Network unreachable | 503         |
- * | 401/403  | Auth error          | 401         |
+ * | 401      | Auth error          | 401         |
+ * | 403      | Permission denied   | 403         |
  * | 429      | Rate limited        | 429         |
  * | Other    | Unknown             | 500         |
  */

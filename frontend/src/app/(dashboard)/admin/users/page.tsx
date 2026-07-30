@@ -115,10 +115,11 @@ function UserRow({ user, updating, onRoleChange }: {
 }
 
 export default function AdminUsersPage() {
-  const { data: users, isLoading } = useAdminUsers();
+  const { data: users, isLoading, error } = useAdminUsers();
   const updateRole = useUpdateUserRole();
   const [search, setSearch] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const filtered = (users ?? []).filter(
     (u) =>
@@ -130,6 +131,25 @@ export default function AdminUsersPage() {
 
   return (
     <PageContainer title="Users" description="Manage all platform users and their roles">
+      {error && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            {error instanceof ApiError ? error.message : 'Error loading users'}
+          </p>
+        </div>
+      )}
+
+      {roleError && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{roleError}</p>
+          <button
+            onClick={() => setRoleError(null)}
+            className="text-xs text-destructive/70 hover:text-destructive"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
@@ -172,10 +192,11 @@ export default function AdminUsersPage() {
                       setUpdating(`${userId}-${organizationId}`);
                       try {
                         await updateRole.mutateAsync({ userId, organizationId, role });
+                        setRoleError(null);
                       } catch (err) {
-                        if (err instanceof ApiError) {
-                          alert(err.message);
-                        }
+                        setRoleError(
+                          err instanceof ApiError ? err.message : 'Failed to update role',
+                        );
                       } finally {
                         setUpdating(null);
                       }

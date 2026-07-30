@@ -56,9 +56,11 @@ function DeleteConfirmModal({
 function CreateOrgModal({
   open,
   onClose,
+  onError,
 }: {
   open: boolean;
   onClose: () => void;
+  onError: (msg: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
@@ -113,6 +115,11 @@ function CreateOrgModal({
                     setSlug('');
                     onClose();
                   },
+                  onError: (err) => {
+                    onError(
+                      err instanceof ApiError ? err.message : 'Failed to create organization',
+                    );
+                  },
                 },
               )
             }
@@ -126,10 +133,12 @@ function CreateOrgModal({
 }
 
 export default function AdminOrganizationsPage() {
-  const { data: orgs, isLoading } = useAdminOrganizations();
+  const { data: orgs, isLoading, error } = useAdminOrganizations();
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/organizations/${id}`),
@@ -137,6 +146,12 @@ export default function AdminOrganizationsPage() {
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
       queryClient.invalidateQueries({ queryKey: adminOrganizationsQueryKey });
       setDeleteTarget(null);
+      setDeleteError(null);
+    },
+    onError: (err) => {
+      setDeleteError(
+        err instanceof ApiError ? err.message : 'Failed to delete organization',
+      );
     },
   });
 
@@ -153,6 +168,37 @@ export default function AdminOrganizationsPage() {
         </Button>
       }
     >
+      {error && (
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            {error instanceof ApiError ? error.message : 'Error loading organizations'}
+          </p>
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{deleteError}</p>
+          <button
+            onClick={() => setDeleteError(null)}
+            className="text-xs text-destructive/70 hover:text-destructive"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {createError && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{createError}</p>
+          <button
+            onClick={() => setCreateError(null)}
+            className="text-xs text-destructive/70 hover:text-destructive"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {!orgs || orgs.length === 0 ? (
         <Card glass>
           <CardContent className="p-8 text-center">
@@ -206,7 +252,11 @@ export default function AdminOrganizationsPage() {
         </Card>
       )}
 
-      <CreateOrgModal open={showCreate} onClose={() => setShowCreate(false)} />
+      <CreateOrgModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onError={(msg) => setCreateError(msg)}
+      />
 
       {deleteTarget && (
         <DeleteConfirmModal
