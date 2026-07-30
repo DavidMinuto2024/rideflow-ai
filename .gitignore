@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# Coverage
+coverage/
+
 # Build output
 dist/
 .next/

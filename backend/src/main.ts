@@ -9,10 +9,23 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
-    const allowedOrigins = corsOrigin.split(',').map((o) => o.trim());
+    const explicitOrigins = corsOrigin.split(',').map((o) => o.trim());
 
     app.enableCors({
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        // Permitir requests sin origin (apps server-to-server, curl, etc.)
+        if (!origin) return callback(null, true);
+
+        // Orígenes explícitos (desde env var)
+        if (explicitOrigins.includes(origin)) return callback(null, true);
+
+        // Vercel preview deployments: *.vercel.app
+        if (origin.endsWith('.vercel.app') || origin === 'https://rideflow.vercel.app') {
+          return callback(null, true);
+        }
+
+        callback(null, false);
+      },
       credentials: true,
     });
 
