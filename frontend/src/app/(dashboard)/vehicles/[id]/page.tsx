@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiError } from '@/lib/api';
+import { getRestrictedDays, DAY_NAMES_ES } from '@/lib/utils/pico-placa';
 
 function VehicleSkeleton() {
   return (
@@ -297,6 +298,30 @@ export default function VehicleDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pico y Placa Restriction */}
+      {vehicle.plate && (
+        <Card glass>
+          <CardContent className="p-5">
+            <h3 className="mb-3 font-display font-semibold">Restricción Pico y Placa</h3>
+            <p className="mb-2 text-sm font-mono text-text-secondary">Placa: {vehicle.plate}</p>
+            <div className="flex flex-wrap gap-2">
+              {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const).map((d) => (
+                <Badge
+                  key={d}
+                  variant={getRestrictedDays(vehicle.plate).includes(d) ? 'warning' : 'default'}
+                  className="text-xs px-2 py-1"
+                >
+                  {DAY_NAMES_ES[d][0]}
+                </Badge>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-text-muted">
+              Días resaltados en ámbar = restricción activa según último dígito de placa (Bogotá L-V)
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </PageContainer>
   );
 }

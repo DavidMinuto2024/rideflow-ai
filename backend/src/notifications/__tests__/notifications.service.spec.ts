@@ -72,6 +72,20 @@ describe('NotificationsService & Multichannel (#12)', () => {
   });
 
   describe('NotificationsService Multichannel Dispatch', () => {
+    // Helper to mock both notifications and preferences tables
+    const mockNotificationsAndPrefs = (notifData: any) => {
+      let callCount = 0;
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'notification_preferences') {
+          return createQuery({ data: { email: true, push: true }, error: null });
+        }
+        if (table === 'notifications') {
+          return createQuery({ data: notifData, error: null });
+        }
+        return createQuery({ data: null, error: null });
+      });
+    };
+
     it('creates notification and triggers PushService', async () => {
       const pushSpy = jest.spyOn(pushService, 'sendPush');
       const fakeNotif = {
@@ -83,9 +97,7 @@ describe('NotificationsService & Multichannel (#12)', () => {
         read: false,
       };
 
-      mockSupabase.from.mockReturnValue(
-        createQuery({ data: fakeNotif, error: null }),
-      );
+      mockNotificationsAndPrefs(fakeNotif);
 
       const res = await service.create({
         type: 'RIDE_APPROVED',
@@ -113,9 +125,7 @@ describe('NotificationsService & Multichannel (#12)', () => {
         user_id: 'passenger-1',
       };
 
-      mockSupabase.from.mockReturnValue(
-        createQuery({ data: fakeNotif, error: null }),
-      );
+      mockNotificationsAndPrefs(fakeNotif);
 
       const res = await service.createPickupTimeNotification(
         'trip-1',
@@ -130,6 +140,69 @@ describe('NotificationsService & Multichannel (#12)', () => {
         body: expect.stringContaining('Your estimated pickup time has been updated'),
         data: { type: 'ESTIMATED_PICKUP_TIME', tripId: 'trip-1' },
       });
+    });
+
+    it('respects user preferences — does not send push if push=false', async () => {
+      const pushSpy = jest.spyOn(pushService, 'sendPush');
+      const fakeNotif = {
+        id: 'notif-3',
+        type: 'RIDE_APPROVED',
+        title: 'Ride Approved',
+        message: 'Approved',
+        user_id: 'user-2',
+      };
+
+      // Mock preferences with push=false
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'notification_preferences') {
+          return createQuery({ data: { email: true, push: false }, error: null });
+        }
+        if (table === 'notifications') {
+          return createQuery({ data: fakeNotif, error: null });
+        }
+        return createQuery({ data: null, error: null });
+      });
+
+      await service.create({
+        type: 'RIDE_APPROVED',
+        title: 'Ride Approved',
+        message: 'Approved',
+        userId: 'user-2',
+      });
+
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    it('respects user preferences — does not send email if email=false', async () => {
+      const emailSpy = jest.spyOn(emailService, 'sendEmail');
+      const fakeNotif = {
+        id: 'notif-4',
+        type: 'RIDE_APPROVED',
+        title: 'Ride Approved',
+        message: 'Approved',
+        user_id: 'user-3',
+      };
+
+      // Mock preferences with email=false
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'notification_preferences') {
+          return createQuery({ data: { email: false, push: true }, error: null });
+        }
+        if (table === 'notifications') {
+          return createQuery({ data: fakeNotif, error: null });
+        }
+        return createQuery({ data: null, error: null });
+      });
+
+      await service.create({
+        type: 'RIDE_APPROVED',
+        title: 'Ride Approved',
+        message: 'Approved',
+        userId: 'user-3',
+        userEmail: 'test@example.com',
+      });
+
+      expect(emailSpy).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,7 +7,9 @@ export type NotificationType =
   | 'RIDE_REJECTED'
   | 'RIDE_CANCELLED'
   | 'TRIP_ASSIGNED'
-  | 'EVENT_REMINDER';
+  | 'EVENT_REMINDER'
+  | 'ESTIMATED_PICKUP_TIME'
+  | 'EVENT_VEHICLE_REGISTERED';
 
 export interface Notification {
   id: string;
@@ -16,6 +18,11 @@ export interface Notification {
   message: string;
   read: boolean;
   createdAt: string;
+}
+
+export interface Preferences {
+  email: boolean;
+  push: boolean;
 }
 
 export function useNotifications() {
@@ -45,5 +52,31 @@ export function useMarkAsRead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
+  });
+}
+
+export function usePreferences() {
+  return useQuery<Preferences>({
+    queryKey: ['notifications', 'preferences'],
+    queryFn: () => apiClient.get<Preferences>('/notifications/preferences'),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdatePreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: Partial<Preferences>) =>
+      apiClient.patch<Preferences>('/notifications/preferences', dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'preferences'] });
+    },
+  });
+}
+
+export function useRegisterDeviceToken() {
+  return useMutation({
+    mutationFn: (dto: { token: string; platform: string }) =>
+      apiClient.post('/notifications/device-token', dto),
   });
 }

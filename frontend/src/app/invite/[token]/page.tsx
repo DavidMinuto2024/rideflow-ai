@@ -15,6 +15,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { ApiError } from '@/lib/api';
+import { PicoPlacaBanner } from '@/components/vehicles/PicoPlacaBanner';
+import {
+  checkPicoYPlacaClient,
+  DAY_NAMES_ES,
+} from '@/lib/utils/pico-placa';
 
 type Step = 'loading' | 'event-info' | 'role-select' | 'driver-form' | 'passenger-form' | 'success' | 'error';
 
@@ -28,6 +33,10 @@ export default function InvitePage() {
   const [role, setRole] = useState<JoinRole | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Pico y Placa state
+  const [picoYPlacaActive, setPicoYPlacaActive] = useState(false);
+  const [picoYPlacaMessage, setPicoYPlacaMessage] = useState<string>('');
 
   // Invite data
   const { data: eventInfo, isLoading: infoLoading, error: infoError } = useInviteInfo(token);
@@ -60,6 +69,46 @@ export default function InvitePage() {
       setOrgId(resolvedOrgId);
     }
   }, [eventInfo]);
+
+  // Pico y Placa computation - watches selected vehicle and event date
+  useEffect(() => {
+    if (!selectedVehicleId || !eventInfo?.date || !vehicles) {
+      setPicoYPlacaActive(false);
+      setPicoYPlacaMessage('');
+      return;
+    }
+
+    const vehicle = vehicles.find((v) => v.id === selectedVehicleId);
+    if (!vehicle?.plate) {
+      setPicoYPlacaActive(false);
+      setPicoYPlacaMessage('');
+      return;
+    }
+
+    const eventDate = new Date(eventInfo.date);
+    const isRestricted = checkPicoYPlacaClient(vehicle.plate, eventDate);
+
+    if (isRestricted) {
+      const dayOfWeek = eventDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const dayCodes: Record<number, 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri'> = {
+        1: 'Mon',
+        2: 'Tue',
+        3: 'Wed',
+        4: 'Thu',
+        5: 'Fri',
+      };
+      const dayCode = dayCodes[dayOfWeek];
+      const lastDigit = vehicle.plate.slice(-1);
+      const dayNameES = dayCode ? DAY_NAMES_ES[dayCode] : '';
+      setPicoYPlacaActive(true);
+      setPicoYPlacaMessage(
+        `Restricción Pico y Placa: ${dayNameES} aplica (dígito ${lastDigit})`,
+      );
+    } else {
+      setPicoYPlacaActive(false);
+      setPicoYPlacaMessage('');
+    }
+  }, [selectedVehicleId, eventInfo?.date, vehicles]);
 
   // Determine initial step based on auth + data state
   useEffect(() => {
@@ -351,6 +400,11 @@ export default function InvitePage() {
                   Ingresa la dirección desde donde partirás hacia el evento.
                 </p>
               </div>
+
+              {/* Pico y Placa Banner */}
+              {picoYPlacaActive && (
+                <PicoPlacaBanner active={picoYPlacaActive} message={picoYPlacaMessage} />
+              )}
 
               {/* Error */}
               {errorMessage && (

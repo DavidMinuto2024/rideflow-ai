@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  Optional,
   Logger,
 } from '@nestjs/common';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
@@ -34,8 +33,8 @@ export class NotificationsService {
 
   constructor(
     private readonly supabase: SupabaseDataService,
-    @Optional() private readonly emailService?: EmailService,
-    @Optional() private readonly pushService?: PushService,
+    private readonly emailService: EmailService,
+    private readonly pushService: PushService,
   ) {}
 
   async findByUser(userId: string) {
@@ -73,6 +72,39 @@ export class NotificationsService {
     return updated;
   }
 
+  /**
+   * Get notification preferences for a user (internal method).
+   * Creates default preferences (email=true, push=true) if none exist.
+   */
+  private async getPreferencesInternal(userId: string): Promise<{ email: boolean; push: boolean }> {
+    const { data: pref, error: findError } = await this.supabase
+      .from('notification_preferences')
+      .select('email, push')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (findError) this.supabase.handleError(findError, 'notification_preferences');
+
+    if (pref) {
+      return { email: pref.email, push: pref.push };
+    }
+
+    // Create default preferences
+    const { data: newPref, error: createError } = await this.supabase
+      .from('notification_preferences')
+      .insert({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        email: true,
+        push: true,
+      })
+      .select('email, push')
+      .single();
+
+    if (createError) this.supabase.handleError(createError, 'notification_preferences');
+    return { email: newPref.email, push: newPref.push };
+  }
+
   async create(dto: CreateNotificationDto) {
     const { data, error } = await this.supabase
       .from('notifications')
@@ -89,8 +121,11 @@ export class NotificationsService {
 
     if (error) this.supabase.handleError(error, 'notifications');
 
-    // Multichannel dispatch (Push + Email)
-    if (this.pushService && dto.userId) {
+    // Check user preferences before sending multichannel
+    const prefs = await this.getPreferencesInternal(dto.userId);
+
+    // Multichannel dispatch (Push + Email) — only if user has enabled them
+    if (prefs.push && this.pushService && dto.userId) {
       this.pushService.sendPush({
         userId: dto.userId,
         title: dto.title,
@@ -99,7 +134,7 @@ export class NotificationsService {
       }).catch((err) => { this.logger.error('Push notification failed', err instanceof Error ? err.stack : err); });
     }
 
-    if (this.emailService && dto.userEmail) {
+    if (prefs.email && this.emailService && dto.userEmail) {
       this.emailService.sendEmail({
         to: dto.userEmail,
         subject: dto.title,
@@ -137,8 +172,11 @@ export class NotificationsService {
 
     if (error) this.supabase.handleError(error, 'notifications');
 
+    // Check user preferences before sending multichannel
+    const prefs = await this.getPreferencesInternal(passengerId);
+
     // Multichannel dispatch: Push + Email for pickup time notification
-    if (this.pushService && passengerId) {
+    if (prefs.push && this.pushService && passengerId) {
       this.pushService.sendPush({
         userId: passengerId,
         title,
@@ -147,7 +185,7 @@ export class NotificationsService {
       }).catch((err) => { this.logger.error('Push notification failed', err instanceof Error ? err.stack : err); });
     }
 
-    if (this.emailService && passengerEmail) {
+    if (prefs.email && this.emailService && passengerEmail) {
       this.emailService.sendEmail({
         to: passengerEmail,
         subject: title,
@@ -156,5 +194,66 @@ export class NotificationsService {
     }
 
     return data;
+  }
+
+  /**
+   * Register or update a device token for push notifications.
+   * Upserts by userId + token (unique constraint on token).
+   */
+  async registerDeviceToken(userId: string, token: string, platform: string) {
+    const { data, error } = await this.supabase
+      .from('user_device_tokens')
+      .upsert({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        token,
+        platform,
+      }, { onConflict: 'token' })
+      .select()
+      .single();
+
+    if (error) this.supabase.handleError(error, 'user_device_tokens');
+    return data;
+  }
+
+  /**
+   * Revoke all device tokens for a user (logout).
+   */
+  async revokeDeviceToken(userId: string) {
+    const { error } = await this.supabase
+      .from('user_device_tokens')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) this.supabase.handleError(error, 'user_device_tokens');
+  }
+
+  /**
+   * Get notification preferences for a user (public wrapper).
+   */
+  async getPreferences(userId: string): Promise<{ email: boolean; push: boolean }> {
+    return this.getPreferencesInternal(userId);
+  }
+
+  /**
+   * Update notification preferences for a user.
+   */
+  async updatePreferences(
+    userId: string,
+    dto: { email?: boolean; push?: boolean },
+  ): Promise<{ email: boolean; push: boolean }> {
+    const { data, error } = await this.supabase
+      .from('notification_preferences')
+      .upsert({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        email: dto.email ?? true,
+        push: dto.push ?? true,
+      }, { onConflict: 'user_id' })
+      .select('email, push')
+      .single();
+
+    if (error) this.supabase.handleError(error, 'notification_preferences');
+    return { email: data.email, push: data.push };
   }
 }

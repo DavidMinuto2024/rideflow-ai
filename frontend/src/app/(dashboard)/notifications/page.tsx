@@ -1,9 +1,12 @@
 'use client';
 
-import { Bell, Check, CheckCheck, Car, Clock, UserPlus, X, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, Check, CheckCheck, Car, Clock, UserPlus, X, XCircle, Mail, Bell as BellIcon } from 'lucide-react';
 import {
   useNotifications,
   useMarkAsRead,
+  usePreferences,
+  useUpdatePreferences,
   type NotificationType,
 } from '@/lib/queries/notifications';
 import { PageContainer } from '@/components/PageContainer';
@@ -46,6 +49,16 @@ const typeConfig: Record<
     label: 'Recordatorio',
     variant: 'info',
   },
+  ESTIMATED_PICKUP_TIME: {
+    icon: <Clock className="size-4" />,
+    label: 'Hora de recogida actualizada',
+    variant: 'warning',
+  },
+  EVENT_VEHICLE_REGISTERED: {
+    icon: <Car className="size-4" />,
+    label: 'Vehículo registrado',
+    variant: 'info',
+  },
 };
 
 function NotificationsSkeleton() {
@@ -58,9 +71,64 @@ function NotificationsSkeleton() {
   );
 }
 
+function PreferencesCard({ prefs, updatePreferences }: { prefs: { email: boolean; push: boolean } | undefined; updatePreferences: ReturnType<typeof useUpdatePreferences> }) {
+  const [email, setEmail] = useState(prefs?.email ?? true);
+  const [push, setPush] = useState(prefs?.push ?? true);
+
+  const handleToggle = async (type: 'email' | 'push', value: boolean) => {
+    if (type === 'email') setEmail(value);
+    else setPush(value);
+    try {
+      await updatePreferences.mutateAsync({ [type]: value });
+    } catch {
+      // Revert on error
+      if (type === 'email') setEmail(!value);
+      else setPush(!value);
+    }
+  };
+
+  return (
+    <Card glass>
+      <CardContent className="p-5">
+        <h3 className="mb-4 font-display font-semibold">Preferencias de notificación</h3>
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={email}
+              onChange={(e) => handleToggle('email', e.target.checked)}
+              disabled={updatePreferences.isPending}
+              className="size-4 rounded border-border text-primary focus:ring-primary focus:ring-2"
+            />
+            <div>
+              <p className="font-medium text-text-primary">Notificaciones por Email</p>
+              <p className="text-xs text-text-muted">Recibir notificaciones importantes en tu correo</p>
+            </div>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={push}
+              onChange={(e) => handleToggle('push', e.target.checked)}
+              disabled={updatePreferences.isPending}
+              className="size-4 rounded border-border text-primary focus:ring-primary focus:ring-2"
+            />
+            <div>
+              <p className="font-medium text-text-primary">Notificaciones Push</p>
+              <p className="text-xs text-text-muted">Recibir alertas en tiempo real en el navegador</p>
+            </div>
+          </label>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function NotificationsPage() {
   const { data: notifications, isLoading } = useNotifications();
+  const { data: prefs, isLoading: prefsLoading } = usePreferences();
   const markAsRead = useMarkAsRead();
+  const updatePreferences = useUpdatePreferences();
 
   const handleMarkAllRead = () => {
     if (!notifications) return;
@@ -76,6 +144,11 @@ export default function NotificationsPage() {
       title="Notificaciones"
       description="Tus notificaciones y alertas"
     >
+      {/* Preferences Card */}
+      {!prefsLoading && (
+        <PreferencesCard prefs={prefs} updatePreferences={updatePreferences} />
+      )}
+
       {!notifications || notifications.length === 0 ? (
         <Card glass>
           <CardContent className="p-8 text-center">

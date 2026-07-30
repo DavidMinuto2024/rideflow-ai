@@ -275,3 +275,29 @@ model Notification {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─── UserDeviceToken ────────────────────────────────────────
+// Device tokens for push notifications (WebPush, FCM, APNs).
+
+model UserDeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // 'web', 'ios', 'android'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ─── NotificationPreference ─────────────────────────────────
+// User notification channel preferences (email, push).
+
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  email     Boolean  @default(true)
+  push      Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
