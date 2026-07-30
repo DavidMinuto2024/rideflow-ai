@@ -1,9 +1,13 @@
 import {
   Injectable,
   NotFoundException,
+  Optional,
+  Logger,
 } from '@nestjs/common';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { EmailService } from './email.service';
+import { PushService } from './push.service';
 
 /**
  * Notification types used across the platform:
@@ -26,7 +30,13 @@ export type NotificationType =
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly supabase: SupabaseDataService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private readonly supabase: SupabaseDataService,
+    @Optional() private readonly emailService?: EmailService,
+    @Optional() private readonly pushService?: PushService,
+  ) {}
 
   async findByUser(userId: string) {
     const { data, error } = await this.supabase
@@ -78,6 +88,25 @@ export class NotificationsService {
       .single();
 
     if (error) this.supabase.handleError(error, 'notifications');
+
+    // Multichannel dispatch (Push + Email)
+    if (this.pushService && dto.userId) {
+      this.pushService.sendPush({
+        userId: dto.userId,
+        title: dto.title,
+        body: dto.message ?? '',
+        data: { type: dto.type },
+      }).catch((err) => { this.logger.error('Push notification failed', err instanceof Error ? err.stack : err); });
+    }
+
+    if (this.emailService && dto.userEmail) {
+      this.emailService.sendEmail({
+        to: dto.userEmail,
+        subject: dto.title,
+        body: dto.message ?? ''
+      }).catch((err) => { this.logger.error('Email notification failed', err instanceof Error ? err.stack : err); });
+    }
+
     return data;
   }
 
@@ -89,20 +118,43 @@ export class NotificationsService {
     tripId: string,
     passengerId: string,
     estimatedPickupTime: Date,
+    passengerEmail?: string,
   ) {
+    const title = 'Pickup time updated';
+    const message = `Your estimated pickup time has been updated to ${estimatedPickupTime.toLocaleTimeString()}`;
+
     const { data, error } = await this.supabase
       .from('notifications')
       .insert({
         id: crypto.randomUUID(),
         type: 'ESTIMATED_PICKUP_TIME',
-        title: 'Pickup time updated',
-        message: `Your estimated pickup time has been updated to ${estimatedPickupTime.toLocaleTimeString()}`,
+        title,
+        message,
         user_id: passengerId,
       })
       .select()
       .single();
 
     if (error) this.supabase.handleError(error, 'notifications');
+
+    // Multichannel dispatch: Push + Email for pickup time notification
+    if (this.pushService && passengerId) {
+      this.pushService.sendPush({
+        userId: passengerId,
+        title,
+        body: message,
+        data: { type: 'ESTIMATED_PICKUP_TIME', tripId },
+      }).catch((err) => { this.logger.error('Push notification failed', err instanceof Error ? err.stack : err); });
+    }
+
+    if (this.emailService && passengerEmail) {
+      this.emailService.sendEmail({
+        to: passengerEmail,
+        subject: title,
+        body: message,
+      }).catch((err) => { this.logger.error('Email notification failed', err instanceof Error ? err.stack : err); });
+    }
+
     return data;
   }
 }
