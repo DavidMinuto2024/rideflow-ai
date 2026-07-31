@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, ZoomControl, Marker, Polyline, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, ZoomControl, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useMemo } from 'react';
@@ -108,6 +108,24 @@ interface MapViewProps {
   waypoints?: MapWaypoint[];
 }
 
+function MapController({
+  bounds,
+  center,
+}: {
+  bounds: L.LatLngBounds | null;
+  center: [number, number];
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (bounds) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+    } else if (center) {
+      map.setView(center, map.getZoom() || 14);
+    }
+  }, [bounds, center, map]);
+  return null;
+}
+
 export default function MapView({
   center = DEFAULT_CENTER,
   zoom = DEFAULT_ZOOM,
@@ -175,6 +193,7 @@ export default function MapView({
       scrollWheelZoom={false}
       className={`h-96 w-full rounded-xl ${className}`}
     >
+      <MapController bounds={bounds} center={effectiveCenter} />
       <ZoomControl position="bottomright" />
       <TileLayer
         url={TILE_URL}

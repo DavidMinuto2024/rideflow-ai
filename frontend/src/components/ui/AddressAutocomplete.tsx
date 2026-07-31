@@ -34,6 +34,8 @@ export interface AddressAutocompleteProps {
   disabled?: boolean;
   className?: string;
   error?: boolean;
+  /** Callback fired when user edits the text (to clear parent coordinates) */
+  onClear?: () => void;
   /** Debounce delay in ms. Default 400. Set to 0 in tests to bypass timing. */
   debounceMs?: number;
 }
@@ -58,6 +60,7 @@ export function AddressAutocomplete({
   disabled,
   className,
   error,
+  onClear,
   debounceMs = DEBOUNCE_MS,
 }: AddressAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
@@ -204,7 +207,10 @@ export function AddressAutocomplete({
         id={id}
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (onClear) onClear();
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         required={required}

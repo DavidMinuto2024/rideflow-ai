@@ -1,0 +1,12 @@
+change: refactor-event-flow
+phase: verify
+status: completed
+mode: openspec
+delivery_strategy: ask-on-risk
+chain_strategy: size-exception
+budget_risk: Low
+artifacts:
+  - proposal.md
+  - specs/event-creation/spec.md
+  - design.md
+  - tasks.md
