@@ -217,12 +217,14 @@ export default function EventDetailPage() {
     return acc;
   }, []);
 
+  const inviteToken = event?.inviteToken ?? event?.invite_token;
+
   const inviteUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/invite/${event.inviteToken}`
-    : `https://rideflow-ai.vercel.app/invite/${event.inviteToken}`;
+    ? `${window.location.origin}/invite/${inviteToken}`
+    : `https://rideflow-ai.vercel.app/invite/${inviteToken}`;
 
   const handleCopyInviteUrl = () => {
-    if (navigator.clipboard) {
+    if (navigator.clipboard && inviteUrl) {
       navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
@@ -301,7 +303,7 @@ export default function EventDetailPage() {
             </Button>
           </Link>
         )}
-        {event.inviteToken && (
+        {inviteToken && (
           <Link href={`/events/${id}/qr`}>
             <Button variant="outline" size="sm">
               <QrCode className="size-4" />
@@ -320,7 +322,7 @@ export default function EventDetailPage() {
       </div>
 
       {/* Shareable Invite URL Banner */}
-      {event.inviteToken && (
+      {inviteToken && (
         <Card glass className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">

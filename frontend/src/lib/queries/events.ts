@@ -29,6 +29,7 @@ export interface Event {
   // Gap Analysis fields
   arrivalTime?: string;
   inviteToken?: string;
+  invite_token?: string;
   inviteTokenExpiresAt?: string;
   qrCodeSvg?: string;
   eventVehicles?: Array<{
