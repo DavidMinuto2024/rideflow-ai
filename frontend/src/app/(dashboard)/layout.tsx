@@ -260,16 +260,33 @@ export default function DashboardLayout({
           {/* User + Logout */}
           <div className="border-t border-rideflow-border p-4">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-rideflow-amber/20 flex items-center justify-center text-sm font-semibold text-rideflow-amber">
+              <div className="w-8 h-8 rounded-full bg-rideflow-amber/20 flex items-center justify-center text-sm font-semibold text-rideflow-amber shrink-0">
                 {user.email?.[0]?.toUpperCase() ?? '?'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user.user_metadata?.full_name ?? user.email}
-                </p>
-                <p className="text-xs text-rideflow-muted2 truncate">
-                  {user.email}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium truncate">
+                    {user.user_metadata?.full_name ?? user.email}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-xs text-rideflow-muted2 truncate max-w-[110px]">
+                    {user.email}
+                  </span>
+                  {effectiveRole && (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                      effectiveRole === 'SUPER_ADMIN'
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                        : effectiveRole === 'ORG_ADMIN'
+                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                        : effectiveRole === 'DRIVER'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    }`}>
+                      {effectiveRole === 'SUPER_ADMIN' ? 'SuperAdmin' : effectiveRole === 'ORG_ADMIN' ? 'Admin' : effectiveRole === 'DRIVER' ? 'Conductor' : 'Pasajero'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <button
@@ -320,6 +337,19 @@ export default function DashboardLayout({
           <span className="ml-3 font-display font-bold text-sm">
             RideFlow <span className="text-rideflow-amber">AI</span>
           </span>
+          {effectiveRole && (
+            <span className={`ml-auto px-2 py-0.5 rounded text-xs font-semibold ${
+              effectiveRole === 'SUPER_ADMIN'
+                ? 'bg-purple-500/20 text-purple-400'
+                : effectiveRole === 'ORG_ADMIN'
+                ? 'bg-cyan-500/20 text-cyan-400'
+                : effectiveRole === 'DRIVER'
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : 'bg-blue-500/20 text-blue-400'
+            }`}>
+              {effectiveRole === 'SUPER_ADMIN' ? 'SuperAdmin' : effectiveRole === 'ORG_ADMIN' ? 'Admin' : effectiveRole === 'DRIVER' ? 'Conductor' : 'Pasajero'}
+            </span>
+          )}
         </header>
 
         {/* Page content */}

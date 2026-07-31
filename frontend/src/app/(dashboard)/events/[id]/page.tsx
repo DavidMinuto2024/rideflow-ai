@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Car, ClipboardList, Pencil, QrCode, SendHorizonal, Sparkles } from 'lucide-react';
+import { ArrowLeft, Car, ClipboardList, Pencil, QrCode, SendHorizonal, Sparkles, Share2, Copy, Check } from 'lucide-react';
 import { DriverSuggestionsModal } from '@/components/trips/DriverSuggestionsModal';
 import {
   useEvent,
@@ -85,6 +85,7 @@ export default function EventDetailPage() {
   const [editDescription, setEditDescription] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const canEdit =
     event &&
@@ -216,10 +217,22 @@ export default function EventDetailPage() {
     return acc;
   }, []);
 
+  const inviteUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/invite/${event.inviteToken}`
+    : `https://rideflow-ai.vercel.app/invite/${event.inviteToken}`;
+
+  const handleCopyInviteUrl = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
   return (
     <PageContainer
       title={event.title}
-      description={`${event.origin} → ${event.destination}`}
+      description={`${event.origin || 'Origen sin definir'} → ${event.destination}`}
       action={
         <Link href="/events">
           <Button variant="outline" size="sm">
@@ -305,6 +318,43 @@ export default function EventDetailPage() {
           Sugerencias
         </Button>
       </div>
+
+      {/* Shareable Invite URL Banner */}
+      {event.inviteToken && (
+        <Card glass className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p className="font-display font-semibold text-sm flex items-center gap-2 text-primary">
+                <Share2 className="size-4" />
+                Enlace para compartir e invitar personas
+              </p>
+              <p className="text-xs text-text-secondary">
+                Copia este enlace para enviarlo por WhatsApp o correo. Permite que conductores añadan sus autos o pasajeros pidan cupo.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Input
+                readOnly
+                value={inviteUrl}
+                className="text-xs font-mono min-w-[220px] max-w-full bg-surface"
+              />
+              <Button size="sm" onClick={handleCopyInviteUrl} className="shrink-0">
+                {copied ? (
+                  <>
+                    <Check className="size-4" />
+                    ¡Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-4" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <DriverSuggestionsModal
         open={suggestionsOpen}
