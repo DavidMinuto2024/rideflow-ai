@@ -8,6 +8,12 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
 
+    // Health check endpoint
+    const httpAdapter = app.getHttpAdapter();
+    httpAdapter.get('/health', (req, res) => {
+      res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
     const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
     const explicitOrigins = corsOrigin.split(',').map((o) => o.trim());
 

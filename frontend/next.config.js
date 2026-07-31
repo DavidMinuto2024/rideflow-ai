@@ -17,6 +17,10 @@ const nextConfig = {
       },
     ];
   },
+  // Disable ESLint during build due to ESLint 10 deprecated options conflict
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig;

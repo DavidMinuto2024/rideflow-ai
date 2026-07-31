@@ -39,11 +39,11 @@ export default function EventTripsPage() {
     !!event?.arrivalTime &&
     !!trips &&
     trips.length > 0 &&
-    (session?.memberships?.some(
+    session?.memberships?.some(
       (m) =>
         m.organization.id === event.organizationId &&
         ['ORG_ADMIN', 'DRIVER', 'SUPER_ADMIN'].includes(m.role),
-    ) || session?.user?.role === 'SUPER_ADMIN');
+    );
 
   const handleOptimize = async () => {
     setOptimizeMessage(null);
