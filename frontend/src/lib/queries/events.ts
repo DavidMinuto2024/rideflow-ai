@@ -11,9 +11,13 @@ export interface Event {
   origin: string;
   originLat?: number;
   originLng?: number;
+  origin_lat?: number;
+  origin_lng?: number;
   destination: string;
   destLat?: number;
   destLng?: number;
+  dest_lat?: number;
+  dest_lng?: number;
   capacity: number;
   status: EventStatus;
   organizationId: string;
@@ -36,6 +40,8 @@ export interface Event {
     startLocation?: string;
     startLat?: number;
     startLng?: number;
+    start_lat?: number;
+    start_lng?: number;
     picoYPlaca: boolean;
   }>;
 }

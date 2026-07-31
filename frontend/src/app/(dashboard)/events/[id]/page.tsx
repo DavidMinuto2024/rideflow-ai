@@ -190,10 +190,31 @@ export default function EventDetailPage() {
     }
   };
 
+  const originLat = event?.originLat ?? event?.origin_lat;
+  const originLng = event?.originLng ?? event?.origin_lng;
+  const destLat = event?.destLat ?? event?.dest_lat;
+  const destLng = event?.destLng ?? event?.dest_lng;
+
   const hasCoords = Boolean(
-    (event.originLat != null && event.originLng != null) ||
-      (event.destLat != null && event.destLng != null),
+    (originLat != null && originLng != null) ||
+      (destLat != null && destLng != null),
   );
+
+  const vehicleWaypoints = (event?.eventVehicles ?? []).reduce<
+    Array<{ lat: number; lng: number; label: string; color: string }>
+  >((acc, ev) => {
+    const lat = ev.startLat ?? ev.start_lat;
+    const lng = ev.startLng ?? ev.start_lng;
+    if (lat != null && lng != null) {
+      acc.push({
+        lat,
+        lng,
+        label: `Salida: ${ev.driver?.name || 'Conductor'} (${ev.startLocation || 'Origen'})`,
+        color: '#22c55e',
+      });
+    }
+    return acc;
+  }, []);
 
   return (
     <PageContainer
@@ -389,15 +410,16 @@ export default function EventDetailPage() {
 
         {/* Map */}
         <div>
-          {hasCoords ? (
+          {hasCoords || vehicleWaypoints.length > 0 ? (
             <Card glass className="overflow-hidden">
               <MapView
-                originLat={event.originLat}
-                originLng={event.originLng}
-                destLat={event.destLat}
-                destLng={event.destLng}
+                originLat={originLat}
+                originLng={originLng}
+                destLat={destLat}
+                destLng={destLng}
                 originLabel={event.origin}
                 destLabel={event.destination}
+                waypoints={vehicleWaypoints}
                 zoom={14}
               />
             </Card>
