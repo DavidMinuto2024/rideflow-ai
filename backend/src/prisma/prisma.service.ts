@@ -26,7 +26,11 @@ export class PrismaService
    */
   async onModuleInit() {
     try {
-      await this.$connect();
+      // Short 500ms timeout for initial Postgres check; Supabase REST API handles all queries
+      await Promise.race([
+        this.$connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Postgres TCP timeout')), 500)),
+      ]);
       this.logger.log('Connected to database');
     } catch (err) {
       this.logger.warn(
