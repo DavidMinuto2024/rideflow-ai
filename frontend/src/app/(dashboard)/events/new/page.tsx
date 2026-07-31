@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { FormField } from '@/components/ui/FormField';
+import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ApiError } from '@/lib/api';
 
@@ -25,7 +26,12 @@ export default function NewEventPage() {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [arrivalTime, setArrivalTime] = useState('');
+  const [origin, setOrigin] = useState('');
+  const [originLat, setOriginLat] = useState<number | null>(null);
+  const [originLng, setOriginLng] = useState<number | null>(null);
   const [destination, setDestination] = useState('');
+  const [destLat, setDestLat] = useState<number | null>(null);
+  const [destLng, setDestLng] = useState<number | null>(null);
   const [capacity, setCapacity] = useState(4);
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +52,12 @@ export default function NewEventPage() {
       await createEvent.mutateAsync({
         title,
         date: eventDate,
-        origin: '',
+        origin,
+        originLat: originLat ?? undefined,
+        originLng: originLng ?? undefined,
         destination,
+        destLat: destLat ?? undefined,
+        destLng: destLng ?? undefined,
         capacity,
         description: description || undefined,
         arrivalTime: new Date(arrivalTime).toISOString(),
@@ -125,27 +135,49 @@ export default function NewEventPage() {
               </FormField>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Hora de llegada" id="arrivalTime" required>
-                <Input
-                  id="arrivalTime"
-                  type="datetime-local"
-                  value={arrivalTime}
-                  onChange={(e) => setArrivalTime(e.target.value)}
-                  required
-                />
-              </FormField>
-              <FormField label="Destino" id="destination">
-                <Input
-                  id="destination"
-                  type="text"
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  required
-                  placeholder="Dirección de llegada"
-                />
-              </FormField>
-            </div>
+            <FormField label="Hora de llegada" id="arrivalTime" required>
+              <Input
+                id="arrivalTime"
+                type="datetime-local"
+                value={arrivalTime}
+                onChange={(e) => setArrivalTime(e.target.value)}
+                required
+              />
+            </FormField>
+
+            <FormField label="Origen (dirección de salida)" id="origin">
+              <AddressAutocomplete
+                id="origin"
+                value={origin}
+                onChange={setOrigin}
+                onSelect={({ address, lat, lng }) => {
+                  setOrigin(address);
+                  setOriginLat(lat);
+                  setOriginLng(lng);
+                }}
+                placeholder="Dirección desde donde salen"
+              />
+            </FormField>
+
+            <FormField label="Destino" id="destination">
+              <AddressAutocomplete
+                id="destination"
+                value={destination}
+                onChange={(val) => {
+                  setDestination(val);
+                  // Clear coords if user edits manually without selecting
+                  setDestLat(null);
+                  setDestLng(null);
+                }}
+                onSelect={({ address, lat, lng }) => {
+                  setDestination(address);
+                  setDestLat(lat);
+                  setDestLng(lng);
+                }}
+                required
+                placeholder="Dirección de llegada"
+              />
+            </FormField>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Capacidad (plazas)" id="capacity">

@@ -1,0 +1,12 @@
+change: address-autocomplete
+phase: verify
+status: completed
+mode: openspec
+delivery_strategy: ask-on-risk
+chain_strategy: size-exception
+budget_risk: Low
+artifacts:
+  - proposal.md
+  - specs/address-autocomplete/spec.md
+  - design.md
+  - tasks.md

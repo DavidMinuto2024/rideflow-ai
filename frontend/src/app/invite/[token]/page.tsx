@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { ApiError } from '@/lib/api';
 import { PicoPlacaBanner } from '@/components/vehicles/PicoPlacaBanner';
+import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import {
   checkPicoYPlacaClient,
   DAY_NAMES_ES,
@@ -390,10 +391,19 @@ export default function InvitePage() {
                 <label className="mb-1 block text-sm font-medium text-text-secondary">
                   Dirección de salida
                 </label>
-                <Input
-                  type="text"
+                <AddressAutocomplete
+                  id="startLocation"
                   value={startLocation}
-                  onChange={(e) => setStartLocation(e.target.value)}
+                  onChange={(val) => {
+                    setStartLocation(val);
+                    setStartLat(null);
+                    setStartLng(null);
+                  }}
+                  onSelect={({ address, lat, lng }) => {
+                    setStartLocation(address);
+                    setStartLat(lat);
+                    setStartLng(lng);
+                  }}
                   placeholder="Dirección donde inicias la ruta"
                 />
                 <p className="mt-1 text-xs text-text-muted">
@@ -447,41 +457,24 @@ export default function InvitePage() {
                 <label className="mb-1 block text-sm font-medium text-text-secondary">
                   Dirección de recogida *
                 </label>
-                <Input
-                  type="text"
+                <AddressAutocomplete
+                  id="pickupAddress"
                   value={pickupAddress}
-                  onChange={(e) => setPickupAddress(e.target.value)}
+                  onChange={(val) => {
+                    setPickupAddress(val);
+                    setPickupLat(null);
+                    setPickupLng(null);
+                  }}
+                  onSelect={({ address, lat, lng }) => {
+                    setPickupAddress(address);
+                    setPickupLat(lat);
+                    setPickupLng(lng);
+                  }}
                   required
                   placeholder="Ej: Cra 15 # 80-20, Bogotá"
                 />
                 <p className="mt-1 text-xs text-text-muted">
-                  Dirección donde te recogerán.
-                </p>
-              </div>
-
-              {/* Optional coordinates */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-text-secondary">
-                  Coordenadas (opcional)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    step="any"
-                    value={pickupLat ?? ''}
-                    onChange={(e) => setPickupLat(e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="Latitud"
-                  />
-                  <Input
-                    type="number"
-                    step="any"
-                    value={pickupLng ?? ''}
-                    onChange={(e) => setPickupLng(e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="Longitud"
-                  />
-                </div>
-                <p className="mt-1 text-xs text-text-muted">
-                  Ayuda a mejorar la precisión. Puedes obtenerlas de Google Maps.
+                  Dirección donde te recogerán. Selecciona una sugerencia para guardar las coordenadas exactas.
                 </p>
               </div>
 
