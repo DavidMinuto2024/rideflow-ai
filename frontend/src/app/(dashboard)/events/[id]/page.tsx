@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import dynamic from 'next/dynamic';
 import { ApiError } from '@/lib/api';
 import { buildWazeDeepLink, buildGoogleMapsDeepLink } from '@/lib/maps';
+import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 
 const MapView = dynamic(() => import('@/components/MapView'), {
   ssr: false,
@@ -74,7 +75,12 @@ export default function EventDetailPage() {
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editArrivalTime, setEditArrivalTime] = useState('');
+  const [editOrigin, setEditOrigin] = useState('');
+  const [editOriginLat, setEditOriginLat] = useState<number | null>(null);
+  const [editOriginLng, setEditOriginLng] = useState<number | null>(null);
   const [editDestination, setEditDestination] = useState('');
+  const [editDestLat, setEditDestLat] = useState<number | null>(null);
+  const [editDestLng, setEditDestLng] = useState<number | null>(null);
   const [editCapacity, setEditCapacity] = useState(4);
   const [editDescription, setEditDescription] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
@@ -95,7 +101,12 @@ export default function EventDetailPage() {
     setEditDate(event.date.split('T')[0]);
     setEditTime(event.date.includes('T') ? event.date.split('T')[1].substring(0, 5) : '');
     setEditArrivalTime(event.arrivalTime ? event.arrivalTime.substring(0, 16) : '');
+    setEditOrigin(event.origin ?? '');
+    setEditOriginLat(event.originLat ?? null);
+    setEditOriginLng(event.originLng ?? null);
     setEditDestination(event.destination);
+    setEditDestLat(event.destLat ?? null);
+    setEditDestLng(event.destLng ?? null);
     setEditCapacity(event.capacity);
     setEditDescription(event.description ?? '');
     setEditError(null);
@@ -110,7 +121,12 @@ export default function EventDetailPage() {
       await updateEvent.mutateAsync({
         title: editTitle,
         date: eventDate,
+        origin: editOrigin,
+        originLat: editOriginLat ?? undefined,
+        originLng: editOriginLng ?? undefined,
         destination: editDestination,
+        destLat: editDestLat ?? undefined,
+        destLng: editDestLng ?? undefined,
         capacity: editCapacity,
         description: editDescription || undefined,
         arrivalTime: editArrivalTime ? new Date(editArrivalTime).toISOString() : undefined,
@@ -174,7 +190,10 @@ export default function EventDetailPage() {
     }
   };
 
-  const hasCoords = event.originLat && event.originLng;
+  const hasCoords = Boolean(
+    (event.originLat != null && event.originLng != null) ||
+      (event.destLat != null && event.destLng != null),
+  );
 
   return (
     <PageContainer
@@ -373,7 +392,12 @@ export default function EventDetailPage() {
           {hasCoords ? (
             <Card glass className="overflow-hidden">
               <MapView
-                center={[event.originLat!, event.originLng!]}
+                originLat={event.originLat}
+                originLng={event.originLng}
+                destLat={event.destLat}
+                destLng={event.destLng}
+                originLabel={event.origin}
+                destLabel={event.destination}
                 zoom={14}
               />
             </Card>
@@ -431,13 +455,40 @@ export default function EventDetailPage() {
             />
           </FormField>
 
+          <FormField label="Origen" id="edit-origin">
+            <AddressAutocomplete
+              id="edit-origin"
+              value={editOrigin}
+              onChange={(val) => {
+                setEditOrigin(val);
+                setEditOriginLat(null);
+                setEditOriginLng(null);
+              }}
+              onSelect={({ address, lat, lng }) => {
+                setEditOrigin(address);
+                setEditOriginLat(lat);
+                setEditOriginLng(lng);
+              }}
+              placeholder="Dirección de salida"
+            />
+          </FormField>
+
           <FormField label="Destino" id="edit-destination" required>
-            <Input
+            <AddressAutocomplete
               id="edit-destination"
-              type="text"
               value={editDestination}
-              onChange={(e) => setEditDestination(e.target.value)}
+              onChange={(val) => {
+                setEditDestination(val);
+                setEditDestLat(null);
+                setEditDestLng(null);
+              }}
+              onSelect={({ address, lat, lng }) => {
+                setEditDestination(address);
+                setEditDestLat(lat);
+                setEditDestLng(lng);
+              }}
               required
+              placeholder="Dirección de llegada"
             />
           </FormField>
 
