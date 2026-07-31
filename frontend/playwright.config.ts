@@ -6,9 +6,14 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: 'list',
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'playwright-report' }],
+  ],
   use: {
-    baseURL: 'http://localhost:3000',
+    // BASE_URL overrides the target deployment (CI provides it as a secret-backed
+    // env var); defaults to the production deployment.
+    baseURL: process.env.BASE_URL ?? 'https://rideflow-ai.vercel.app',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
